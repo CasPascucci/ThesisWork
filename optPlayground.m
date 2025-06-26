@@ -20,11 +20,13 @@ g_dim = [0; 0; -g_const]; % grav accel in -z direction
 af_dim = [0; 0; 2*g_const];
 tgo_min_dim = 1;
 
+
 %% Reference Values
 L_ref = 1000; % Arbitrarily Set, can be redefined if there is a reason to use another set of values
 T_ref = 1;
 A_ref = L_ref/T_ref^2;
 V_ref = L_ref/T_ref;
+
 
 %% Non Dim Values
 r = r_dim/L_ref;
@@ -34,6 +36,7 @@ v = v_dim/V_ref;
 vf_star = vf_dim/V_ref;
 tgo_min = tgo_min_dim/T_ref;
 g = g_dim/A_ref;
+
 
 
 nonLinearCons = @(x) nonlinearConstraints(x, af_star, g, rf_star, r, v, vf_star, L_ref, V_ref, T_ref); % Pass all needed parameters
