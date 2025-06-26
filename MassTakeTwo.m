@@ -133,6 +133,8 @@ ylabel('Acceleration (m/s^2)');
 
 figure(4); hold on;
 plot(t_traj,mass_list)
+yline(mass_init_dim/M_ref,'r--');
+yline(mass_dry_dim/M_ref,'g--');
 %% Functions
 %Cost function to optimize
 function cost = objective(params, af_star, g, rf_star, r, V_star, V)
