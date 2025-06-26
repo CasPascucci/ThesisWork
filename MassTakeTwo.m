@@ -130,6 +130,9 @@ plot(t_traj, min_thrust./mass_list*A_ref,'m--');
 legend('X Thrust Accel','Y Thrust Accel','Z Thrust Accel','Norm Thrust Accel');
 xlabel('Time (s)');
 ylabel('Acceleration (m/s^2)');
+
+figure(4); hold on;
+plot(t_traj,mass_list)
 %% Functions
 %Cost function to optimize
 function cost = objective(params, af_star, g, rf_star, r, V_star, V)
@@ -156,6 +159,7 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, af_star, g, rf_star, V_star, m
     V = X(4:6);
     mass = X(7);
     
+    g_nondim = g(3);
     tgo = max((tgo0 - t),0.01);
     
     aT = compute_aT(gamma, kr, tgo, af_star, g, rf_star, r, V_star, V);
@@ -171,7 +175,7 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, af_star, g, rf_star, V_star, m
         aT = (aT/norm_aT)*(min_thrust/mass);
         norm_aT = norm(aT);
     end
-    dm_dt = -F_mag/ isp*(-g(3));
+    dm_dt = -F_mag/ (isp*-g_nondim);
 
     dXdt = [V;aT;dm_dt];
 end
@@ -190,13 +194,13 @@ function [c, ceq] = nonlinearConstraints(params, af_star, g, rf_star, r0, vf_sta
     % The ode45 tspan must be in non-dimensional units, scaled by T_ref.
     tspan = [0, tgo]; % Non-dimensional time span for ODE
 
-    odeoptions = odeset('RelTol',1e-9,'AbsTol',1e-9);
+    odeoptions = odeset('RelTol',1e-8,'AbsTol',1e-8);
     [~, state_traj_nd] = ode45(@(t_nd, X_nd) trajectory(t_nd, X_nd, gamma, kr, tgo,...
                                     af_star, g, rf_star, vf_star, max_thrust, min_thrust, isp), tspan, X0, odeoptions);
 
     % Ineq > 0
     c1 = min(state_traj_nd(:,3)); % This will be a vector of constraints, one for each time step
-    c2 = state_traj_nd(end, 7) - 0.3 * m0; % Final mass constraint
+    c2 = state_traj_nd(end, 7) - 18000/62000 * m0; % Final mass constraint
     c = [c1 c2];
 
     ceq = [];
