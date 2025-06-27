@@ -15,7 +15,7 @@ g_const = 9.81;
 r_dim = [20000; 2500; 5000]; % Initial position, can be varied
 rf_dim = [0; 0; 0]; % Target position
 v_dim = [-350; 0; -200]; % Initial velocity
-vf_dim = [0; 0; 0]; % Target velocity
+vf_dim = [0; 0; -0.001]; % Target velocity
 g_dim = [0; 0; -g_const]; % grav accel in -z direction
 af_dim = [0; 0; 2*g_const];
 tgo_min_dim = 1;
@@ -47,7 +47,7 @@ isp = isp_dim/T_ref;
 max_thrust = max_thrust_dim/(M_ref*A_ref);
 min_thrust = min_thrust_dim/(M_ref*A_ref);
 
-nonLinearCons = @(x) nonlinearConstraints(x, af_star, g, rf_star, r, v, vf_star, L_ref, V_ref, T_ref, m0, max_thrust, min_thrust, isp); % Pass all needed parameters
+nonLinearCons = @(x) nonlinearConstraints(x, af_star, g, rf_star, r, v, vf_star, m0, max_thrust, min_thrust, isp); % Pass all needed parameters
 %Linear inequalities to handle the constraints on our three parameters
 linear_ineq_matrix = [-1 0 0;
                       2 -1 0;
@@ -91,8 +91,16 @@ for i=1:length(t_traj)
 end
 aT_norm = vecnorm(aT_list,2,2);
 
-figure(1); hold on;
+%Check Values at lowest height before landing
+lowestIdx = find(diff(sign(state_traj(:,3))),1,"first");
+lowestHeight = state_traj(lowestIdx,3);
+lowestHeight_Vel = sqrt(state_traj(lowestIdx,4)^2 + state_traj(lowestIdx,5)^2 + state_traj(lowestIdx,6)^2);
+lowestHeightDim = lowestHeight*L_ref
+lowestHeightVelDim = lowestHeight_Vel*V_ref
 
+
+
+figure(1); hold on;
 scatter3(state_traj(:,1),state_traj(:,2),state_traj(:,3), 20, aT_norm, 'filled');
 xlabel('X');
 ylabel('Y');
@@ -183,7 +191,7 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, af_star, g, rf_star, V_star, m
 end
 
 % Nonlinear Constraint Equations, keeps Z positive, and Mass within range
-function [c, ceq] = nonlinearConstraints(params, af_star, g, rf_star, r0, vf_star, v0, L_ref, V_ref, T_ref, m0, max_thrust, min_thrust, isp)
+function [c, ceq] = nonlinearConstraints(params, af_star, g, rf_star, r0, vf_star, v0, m0, max_thrust, min_thrust, isp)
     gamma = params(1);
     kr = params(2);
     tgo = params(3);
