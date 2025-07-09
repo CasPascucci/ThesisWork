@@ -4,15 +4,15 @@ clear; clc; close all;
 x0 = [1; 6; 1]; %Initial Guess for gamma, kr, tgo
 
 % Variable bounds: [gamma, kr, tgo]
-lb = [0.01, 0.01, 0.01];  % Avoid zero values or negative time to go
-ub = [5, 15, 3];
+lb = [0.1, 4.2, 0.5];  % Avoid zero values or negative time to go
+ub = [5, 25, 3];
 
 % fmincon options
 options = optimoptions('fmincon','Display','iter-detailed','MaxFunctionEvaluations',1000);%,'EnableFeasibilityMode',true,'SubproblemAlgorithm','cg'); % Options for fmincon
 %'Algorithm','sqp',
 %% Dimensional Values
 g_const = 3.73;
-r_dim = [20000; 5000; 10000]; % Initial position, can be varied
+r_dim = [20000; 3000; 5000]; % Initial position, can be varied
 rf_dim = [0; 0; 0]; % Target position
 v_dim = [-500; 0; -200]; % Initial velocity
 vf_dim = [0; 0; -0.1]; % Target velocity
@@ -49,13 +49,13 @@ min_thrust = min_thrust_dim/(M_ref*A_ref);
 
 nonLinearCons = @(x) nonlinearConstraints(x, af_star, g, rf_star, r, v, vf_star, m0, max_thrust, min_thrust, isp); % Pass all needed parameters
 %Linear inequalities to handle the constraints on our three parameters
-linear_ineq_matrix = [-1 0 0;
-                      2 -1 0;
-                      0 0 -1];
+linear_ineq_matrix = [-1 0 0; % gamma >= 0
+                      2 -1 0; % 2gamma - kr <= -4  --> 2(gamma+2) < = kr
+                      0 0 -1]; % - tgo <= -tgo_min --> tgo >= tgo_min
 linear_ineq_vec = [0; -4; -tgo_min];
 
 % Call fmincon to optimize 
-[x_opt, fval] = fmincon(@(params) objective(params, af_star, g, rf_star, r, vf_star, v), ...
+[x_opt, fval] = fmincon(@(params) objective(params, af_star, g, rf_star, r, vf_star, v, m0, max_thrust, min_thrust, isp), ...
                           x0, linear_ineq_matrix, linear_ineq_vec, [], [], lb, ub,nonLinearCons, options);
 
 gamma_opt = x_opt(1)
@@ -75,7 +75,7 @@ for i=1:length(t_traj)
     current_r = state_traj(i,1:3).';
     current_v = state_traj(i,4:6).';
     tgo = max((tgo_opt - t_traj(i)),0.001);
-    aT = compute_aT(gamma_opt, kr_opt, tgo_opt, af_star,g,rf_star,current_r,vf_star,current_v).';
+    aT = compute_aT(gamma_opt, kr_opt, tgo, af_star,g,rf_star,current_r,vf_star,current_v).';
     norm_aT = norm(aT);
     F_mag = norm_aT * mass_list(i);
     
@@ -148,21 +148,41 @@ yline(mass_init_dim/M_ref,'r--');
 yline(mass_dry_dim/M_ref,'g--');
 %% Functions
 %Cost function to optimize
-function cost = objective(params, af_star, g, rf_star, r, V_star, V)
+function cost = objective(params, af_star, g, rf_star, r, vf_star, v, m, max_thrust, min_thrust, isp)
     gamma = params(1);
     kr = params(2);
     tgo = params(3);
-    
-    aT = compute_aT(gamma, kr, tgo, af_star, g, rf_star, r, V_star, V);
-    cost = norm(aT);
+    N = 300;
+    tspan = linspace(0,tgo,N);
+    odeoptions = odeset('RelTol',1e-6,'AbsTol',1e-6);
+    X0 = [r; v; m];
+
+    [T, X] = ode45(@(t_nd, X_nd) trajectory(t_nd, X_nd, gamma, kr, tgo,...
+                                    af_star, g, rf_star, vf_star, max_thrust, min_thrust, isp), tspan, X0, odeoptions);
+    thrustProfile = zeros(1,N);
+    for i=1:N
+        r_i = X(i,1:3);
+        v_i = X(i,4:6);
+        tau = max(tgo - T(i),0.001);
+      aT_i   = compute_aT(gamma, kr, tau, af_star, g, rf_star, r_i, vf_star, v_i);
+      thrustProfile(i) = norm(aT_i)*X(i,7);  % aT*m → force
+    end
+    if mod(length(T)-1,2)==1
+        T = T(1:end-1);
+        thrustProfile = thrustProfile(1:end-1);
+    end
+    cost = simpsonIntegral(T, thrustProfile);
+
+    %aT = compute_aT(gamma, kr, tgo, af_star, g, rf_star, r, V_star, V);
+    %cost = norm(aT);
 end
 
 %helper function to calculate current commanded thrust
 function aT = compute_aT(gamma, kr, tgo, af_star, g, rf_star, r, V_star, V)
-    term1 = gamma * ((kr / (2*(gamma + 2)) - 1) * af_star);
-    term2 = (gamma * kr / (2*(gamma + 2)) - gamma - 1) * g;
-    term3 = (gamma + 1)/tgo * (1 - kr / (gamma + 2)) * (V_star - V);
-    term4 = kr / tgo^2 * (rf_star - r - V * tgo);
+    term1 = gamma * (((kr / (2*(gamma + 2))) - 1) * af_star);
+    term2 = ((gamma * kr / (2*(gamma + 2))) - gamma - 1) * g;
+    term3 = (gamma + 1)/tgo * (1 - (kr / (gamma + 2))) * (V_star - V);
+    term4 = (kr / tgo^2) * (rf_star - r - V * tgo);
     aT = term1 + term2 + term3 + term4;
 end
 
@@ -179,15 +199,15 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, af_star, g, rf_star, V_star, m
     norm_aT = norm(aT);
     F_mag = norm_aT * mass;
     
-    if F_mag > max_thrust
-        F_mag = max_thrust;
-        aT = (aT/norm_aT)*(max_thrust/mass);
-        norm_aT = norm(aT);
-    elseif F_mag < min_thrust
-        F_mag = min_thrust;
-        aT = (aT/norm_aT)*(min_thrust/mass);
-        norm_aT = norm(aT);
-    end
+    % if F_mag > max_thrust
+    %     F_mag = max_thrust;
+    %     aT = (aT/norm_aT)*(max_thrust/mass);
+    %     norm_aT = norm(aT);
+    % elseif F_mag < min_thrust
+    %     F_mag = min_thrust;
+    %     aT = (aT/norm_aT)*(min_thrust/mass);
+    %     norm_aT = norm(aT);
+    % end
     dm_dt = -F_mag/ (isp*-g_nondim);
 
     dXdt = [V;aT;dm_dt];
@@ -202,18 +222,45 @@ function [c, ceq] = nonlinearConstraints(params, af_star, g, rf_star, r0, vf_sta
 
     X0 = [r0; v0; m0];
 
-    tspan = [0, tgo]; % Non-dimensional time span for ODE
+    tspan = linspace(0,tgo,300); % Non-dimensional time span for ODE
 
     odeoptions = odeset('RelTol',1e-6,'AbsTol',1e-6);
-    [~, state_traj_nd] = ode45(@(t_nd, X_nd) trajectory(t_nd, X_nd, gamma, kr, tgo,...
+    [T, state_traj_nd] = ode45(@(t_nd, X_nd) trajectory(t_nd, X_nd, gamma, kr, tgo,...
                                     af_star, g, rf_star, vf_star, max_thrust, min_thrust, isp), tspan, X0, odeoptions);
 
+    N = size(state_traj_nd,1);
+   thrustProfile = zeros(N,1);
+   for i = 1:N
+       radius = state_traj_nd(i,1:3);
+       velocity = state_traj_nd(i,4:6);
+       currentMass = state_traj_nd(i,7);
+       currentTgo = max(tgo - T(i),0.001);
+       aT = compute_aT(gamma, kr, currentTgo, af_star, g, rf_star, radius, vf_star, velocity);
+       thrustProfile(i) = norm(aT)*currentMass;
+   end
+    
+    
     % Ineq > 0
     %c1 = -min(state_traj_nd(:,3)); % This will be a vector of constraints, one for each time step
-    c1 = -(state_traj_nd(end,3))
+
+
+    c1 = -(state_traj_nd(end,3)); % Z constraint
     c2 = state_traj_nd(end, 7) - 18000/62000 * m0; % Final mass constraint
-    c = [c1 c2];
+    c3 = max(thrustProfile - max_thrust);
+    c4 = max(min_thrust - thrustProfile);
+    c = [c1 c2 c3 c4];
     
     %ceq1 = min(state_traj_nd(:,3));
     ceq = [];
+end
+% Simspons Rule Integral: Composite 1/3
+function I = simpsonIntegral(t, y)
+    N = length(t)-1;
+    if mod(N,2) ~=0
+        error("Simpson's needs an even number of intervals, odd number of points.");
+    end
+
+    h = (t(end) - t(1))/N;
+    I = y(1) + y(end) + 4*sum(y(2:2:end-1)) + 2*sum(y(3:2:end-2));
+    I = I * (h/3);
 end
