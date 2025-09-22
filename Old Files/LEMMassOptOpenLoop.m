@@ -1,0 +1,391 @@
+function [optParams] = LEMMassOptOpenLoop(x0)
+    % Apollo Lunar Lander, Optimized Fractional-Polynomial Guidance 
+    
+    
+    %% ========================================================================
+    %  OPTIMIZATION SETUP
+    %% ========================================================================
+
+    % Initial guess for optimization variables: [gamma, kr, tgo]
+    %x0 = [1; 6.1; 10]; % Initial around E-Guidance
+    %x0 = [1; 12.1; 10]; % Initial around Apollo Guidance
+    %x0 = [2; 8.1; 10]; % New initial guess folllowing gamma kr relation
+    
+    % Variable bounds: [gamma, kr, tgo]
+    lb = [0.001, 0.001, 0.001];    % Lower bounds - avoid zero/negative values
+    ub = [5, 25, 20];        % Upper bounds
+    
+    % Optimization options
+    fminconOptions = optimoptions('fmincon', ...
+        'Display', 'iter-detailed', ...
+        'MaxFunctionEvaluations', 1000,...
+        'FiniteDifferenceType','central','FiniteDifferenceStepSize',1e-6, ...
+        'Algorithm','sqp','HessianApproximation','lbfgs');
+    
+    %% ========================================================================
+    %  DIMENSIONAL PHYSICAL PARAMETERS
+    %% ========================================================================
+    
+    % Gravitational and environmental constants
+    %gMars = 3.73;                    % Gravitational acceleration for Mars (m/s²)
+    gMoon = 1.736;                    % Gravitational acceleration for Moon (m/s²)
+    g0 = 9.81;                         % Constant for earth, used for isp
+    %Get PDI IC from Lunar Paper
+    altitude = 15.24; %km
+    lonInitDeg = 41.85;
+    latInitDeg = -71.6;
+    landingLonDeg = 41.85;
+    landingLatDeg = -90;
+    inertialVelocity = 1698.3; %m/s
+    flightPathAngle = 0; %deg
+    %lunarRadius = ; %Optional value, but a default is in PDIToLocalCartesian()
+    [rDim, vDim] = PDIToLocalCartesian(altitude, lonInitDeg, latInitDeg, landingLonDeg, landingLatDeg, inertialVelocity, flightPathAngle);
+    % ^ Values returned in m and m/s
+    
+    
+    % Initial and final conditions (dimensional)
+    
+    rfDim = [0; 0; 0];                % Target position (m)
+    vfDim = [0; 0; -1.0];             % Target velocity (m/s)
+    gDim = [0; 0; -gMoon];          % Gravity vector (m/s²)
+    afDim = [0; 0; -2*gMoon];        % Final acceleration (m/s²)
+    
+    % Time constraints
+    tgoMinDim = 1;                   % Minimum time-to-go (s)
+    
+    % Spacecraft mass properties
+    massInitDim = 15103.0;             % Initial mass (kg)
+    massDryDim = massInitDim - 8248;   % Dry mass (kg)
+    ispDim = 311;                      % Specific impulse of Apollo Lunar Module, found, not from paper
+    
+    % Thrust constraints
+    maxThrustDim = 45000;           % Maximum thrust (N)
+    minThrustDim = 4500; % Minimum thrust (N)
+    
+    %% ========================================================================
+    %  NON-DIMENSIONALIZATION
+    %% ========================================================================
+    
+    % Reference values for non-dimensionalization
+    L_ref = 10000;                    % Reference length (m)
+    T_ref = sqrt(L_ref/gMoon);      % Reference time (s)
+    A_ref = gMoon;          % Reference acceleration (m/s²)
+    V_ref = L_ref / T_ref;            % Reference velocity (m/s)
+    M_ref = 15103.0;            % Reference mass (kg)
+    if nargout >= 7
+        referenceVars = [L_ref, T_ref, A_ref, V_ref, M_ref];
+    end
+
+    % Convert to non-dimensional values
+    r = rDim / L_ref;
+    rfStar = rfDim / L_ref;
+    afStar = afDim / A_ref;
+    v = vDim / V_ref;
+    vfStar = vfDim / V_ref;
+    tgoMin = tgoMinDim / T_ref;
+    g = gDim / A_ref;
+    m0 = massInitDim / M_ref;
+    mfMin = massDryDim / M_ref;
+    isp = ispDim * g0/ (A_ref * T_ref);
+    %maxThrust = max_thrust_dim / (M_ref * A_ref);
+    %minThrust = min_thrust_dim / (M_ref * A_ref);
+    
+    %% ========================================================================
+    %  CONSTRAINT SETUP
+    %% ========================================================================
+    
+    % Linear inequality constraints: Ax <= b
+    linearIneqMatrix = [-1  0  0;    % gamma >= 0
+                         2 -1  0;    % 2*gamma - kr <= -4 (kr >= 2*gamma + 4)
+                         0  0 -1];   % tgo >= tgo_min
+    linearIneqVec = [-1e-2; -4-1e-2; -tgoMin];
+    
+    %% ========================================================================
+    %  OPTIMIZATION EXECUTION
+    %% ========================================================================
+    
+    
+    % Solve the optimization problem
+    [optParams, costEval] = fmincon(...
+        @(params) objectiveFunction(params, afStar, g, rfStar, r, vfStar, v, m0, mfMin, isp), ...
+        x0, linearIneqMatrix, linearIneqVec, [], [], lb, ub, ...
+        [], fminconOptions);
+    
+    % Extract optimal parameters
+    gammaOpt = optParams(1);
+    krOpt = optParams(2);
+    tgoOpt = optParams(3); 
+    % Initial time-to-go (non-dimensional)
+    tgoOptDim = tgoOpt * T_ref;     % Convert to dimensional time
+    
+    fprintf('\nOptimal Parameters:\n');
+    fprintf('  gamma = %.4f\n', gammaOpt);
+    fprintf('  kr = %.4f\n', krOpt);
+    fprintf('  tgo = %.4f (%.2f s)\n\n', tgoOpt, tgoOptDim);
+    fprintf('  Minimum cost = %.3f kg of original %.3f kg\n\n', costEval*M_ref, M_ref); % mass
+    
+    gamma1Opt = gammaOpt;
+    gamma2Opt = krOpt/(gammaOpt+2)-2;
+    fprintf('   gamma1 = %.4f\n', gamma1Opt);
+    fprintf('   gamma2 = %.4f\n', gamma2Opt);
+    
+    %% ========================================================================
+    %  TRAJECTORY SIMULATION
+    %% ========================================================================
+    
+    fprintf('\nSimulating optimal trajectory...\n');
+    
+    X0 = [r; v; m0];
+    tspan = linspace(0, tgoOpt, 1000); % Ensures trajectory isn't sparse, especially towards beginning
+    
+    
+    odeoptions = odeset('RelTol', 1e-8, 'AbsTol', 1e-8);
+    
+    [c1,c2] = computeCoefficients(r, v, tgoOpt, gamma1Opt, gamma2Opt, afStar, g, rfStar, vfStar);
+    
+    [tTraj, stateTraj] = ode45(@(t, X) trajectory(t, X, gamma1Opt, gamma2Opt, ...
+        tgoOpt, afStar, g, isp, c1, c2), ...
+        tspan, X0, odeoptions);
+    
+    %% ========================================================================
+    %  POST-PROCESSING AND ANALYSIS
+    %% ========================================================================
+    
+    % Calculate thrust acceleration profile
+    aTList = zeros(length(tTraj), 3);
+    massList = stateTraj(:, 7);
+    
+    gamma1 = gammaOpt;
+    gamma2 = krOpt/(gammaOpt + 2) - 2;
+    gammaPair = [gamma1, gamma2];
+
+    initialRad = stateTraj(1, 1:3).';
+    initialVel = stateTraj(1, 4:6).';
+    [c1, c2] = computeCoefficients(initialRad, initialVel, tgoOpt, gamma1, gamma2, afStar, g, rfStar, vfStar);
+    
+    for i = 1:length(tTraj)
+        
+        tgo = max((tgoOpt - tTraj(i)), 0.001);
+        aT = afStar + c1*tgo^gamma1 + c2*tgo^gamma2;
+        norm_aT = norm(aT);
+        F_mag = norm_aT * massList(i);
+        
+        aTList(i, :) = aT;
+    end
+    
+    aT_norm = vecnorm(aTList, 2, 2);
+    
+    % Final trajectory analysis
+    vf_real_norm_dim = sqrt(stateTraj(end,4)^2 + stateTraj(end,5)^2 + ...
+                           stateTraj(end,6)^2) * V_ref*sign(stateTraj(end,6));
+    xf_real_dim = stateTraj(end, 1) * L_ref;
+    yf_real_dim = stateTraj(end, 2) * L_ref;
+    zf_real_dim = stateTraj(end, 3) * L_ref;
+    rf_real_norm_dim = sqrt(stateTraj(end,1)^2 + stateTraj(end,2)^2 + ...
+                           stateTraj(end,3)^2) * L_ref;
+    
+    fprintf('\nFinal Trajectory Results:\n');
+    fprintf('  Final velocity magnitude: %.2f m/s\n', vf_real_norm_dim);
+    fprintf('  Final position: [%.2f, %.2f, %.2f] m\n', xf_real_dim, yf_real_dim, zf_real_dim);
+    fprintf('  Final position magnitude: %.2f m\n', rf_real_norm_dim);
+    fprintf('  Consumed mass from sim: %.3f kg of original %.3f kg\n', M_ref - M_ref*massList(end), M_ref);
+    
+    %% ========================================================================
+    %  VISUALIZATION
+    %% ========================================================================
+    
+    % Figure 1: 3D trajectory with thrust acceleration coloring
+    figure(1); hold on;
+    scatter3(stateTraj(:,1), stateTraj(:,2), stateTraj(:,3), 20, aT_norm, 'filled');
+    xlabel('East (Non-dimensional)');
+    ylabel('North (Non-dimensional)');
+    zlabel('Up (Non-dimensional)');
+    title('3D Trajectory with Thrust Acceleration Magnitude');
+    grid on;
+    view(45, 45);
+    axis equal;
+    colormap(brewermap([], '-RdYlBu'));
+    c = colorbar;
+    c.Label.String = 'Thrust Acceleration Magnitude';
+    
+    % Figure 2: 2D trajectory
+    figure(2); hold on;
+    plot(stateTraj(:,2)*L_ref/1000,stateTraj(:,3)*L_ref/1000);
+    xlabel("North km");
+    ylabel("Up km");
+    title("2D Trajectory Plot");
+    grid on;
+    ylim([0, 16]);
+    xlim([0, 600]);
+    yticks([0 5 10 15 20]);
+    
+    
+    % Figure 3: Thrust acceleration components (non-dimensional)
+    figure(3);
+    plot(tTraj, aTList(:,1), 'r-', 'LineWidth', 1.5);
+    hold on;
+    plot(tTraj, aTList(:,2), 'g-', 'LineWidth', 1.5);
+    plot(tTraj, aTList(:,3), 'c-', 'LineWidth', 1.5);
+    plot(tTraj, vecnorm(aTList, 2, 2), '--', 'LineWidth', 2,'Color',[1 0.65 0]);
+    legend('East Thrust Accel', 'North Thrust Accel', 'Up Thrust Accel', ...
+           'Magnitude', 'Location', 'best');
+    xlabel('Non-dimensional Time');
+    ylabel('Non-dimensional Acceleration');
+    title('Thrust Acceleration Profile (Non-dimensional)');
+    grid on;
+    
+    % Figure 4: Thrust acceleration components (dimensional)
+    figure(4);
+    plot(tTraj * T_ref, aTList(:,1) * A_ref, 'r-', 'LineWidth', 1.5);
+    hold on;
+    plot(tTraj * T_ref, aTList(:,2) * A_ref, 'g-', 'LineWidth', 1.5);
+    plot(tTraj * T_ref, aTList(:,3) * A_ref, 'c-', 'LineWidth', 1.5);
+    plot(tTraj * T_ref, vecnorm(aTList, 2, 2) * A_ref, '--', 'LineWidth', 2,'Color',[1 0.65 0]);
+    legend('East Thrust Accel', 'North Thrust Accel', 'Up Thrust Accel', ...
+           'Magnitude', 'Location', 'best');
+    xlabel('Time (s)');
+    ylabel('Acceleration (m/s²)');
+    title('Thrust Acceleration Profile (Dimensional)');
+    grid on;
+    
+    % Figure 5, Velocity Components
+    figure(5);
+    plot(tTraj * T_ref, stateTraj(:,4) * V_ref, 'r-', 'LineWidth', 1.5);
+    hold on;
+    plot(tTraj * T_ref, stateTraj(:,5) * V_ref, 'g-', 'LineWidth', 1.5);
+    plot(tTraj * T_ref, stateTraj(:,6) * V_ref, 'c-', 'LineWidth', 1.5);
+    plot(tTraj * T_ref, vecnorm([stateTraj(:,4),stateTraj(:,5),stateTraj(:,6)], 2, 2) * V_ref, '--', 'LineWidth', 2,'Color',[1 0.65 0]);
+    legend('East Vel Component', 'North Vel Component', 'Up Vel Component', ...
+           'Magnitude', 'Location', 'best');
+    xlabel('Time (s)');
+    ylabel('Velocity (m/s)');
+    title('Velocity Profile (Dimensional)');
+    grid on;
+    
+    % Figure 6, Throttle Profile
+    figure(6); hold on
+    plot(tTraj*T_ref, (vecnorm(aTList.*massList,2,2)*A_ref*M_ref)/maxThrustDim);
+    yline(maxThrustDim/maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
+    yline(minThrustDim/maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
+    xlabel('Time');
+    ylabel('Throttle Fraction');
+    title('Throttle Profile (Limits just for Display)')
+    ylim([-0.1,1.1]);
+    
+    
+    % Figure 7: Mass depletion over time
+    figure(7);
+    plot(tTraj, massList, 'c-', 'LineWidth', 2);
+    hold on;
+    yline(massInitDim / M_ref, 'r--', 'LineWidth', 1, 'DisplayName', 'Initial Mass');
+    yline(massDryDim / M_ref, 'g--', 'LineWidth', 1, 'DisplayName', 'Dry Mass');
+    xlabel('Non-dimensional Time');
+    ylabel('Non-dimensional Mass');
+    title('Mass Depletion Profile');
+    legend('Current Mass', 'Initial Mass', 'Dry Mass', 'Location','northeast');
+    grid on;
+end
+%% ========================================================================
+%  SUPPORTING FUNCTIONS
+%% ========================================================================
+
+function cost = objectiveFunction(params, af_star, g, rf_star, r, vf_star, v, m, mf_min, isp)
+    gamma  = params(1);
+    kr     = params(2);
+    tgo0   = params(3);
+
+    % compute gamma1, gamma2
+    gamma1 = gamma;
+    gamma2 = kr/(gamma+2) - 2;
+    if gamma2 < 0
+        cost = 1e10;
+        return;
+    end
+
+    % --- SOLVE c1,c2 ONCE AT THE START ---
+    [c1, c2] = computeCoefficients(...
+        r, v, tgo0, gamma1, gamma2, af_star, g, rf_star, vf_star);
+
+    N = 1001;
+    tspan = linspace(0, tgo0, N);
+
+    phi1 = tspan.^gamma1;
+    phi2 = tspan.^gamma2;
+
+    aT = af_star(:) + c1(:)*phi1 + c2(:)*phi2;  
+    aT_norm = vecnorm(aT,2,1);
+
+    
+    gn = -g(3); %Positive value
+    mdot = aT_norm / (isp*gn);
+
+    I = simpsonIntegral(tspan, mdot);
+
+
+    m_final = m * exp(-I);
+    if m_final < mf_min
+        deficit = mf_min - m_final;
+        cost = 1000*deficit^2 + (m-m_final);
+    else
+        cost    = m - m_final;
+    end
+end
+
+%----------------------------------------------------------------------------------------------
+function [c1, c2] = computeCoefficients(r, v, tgo, gamma1, gamma2, af_star, g, rf_star, vf_star)
+    %phi1 = tgo^gamma1;
+    %phi2 = tgo^gamma2;
+
+    phi1_bar = -1/(gamma1 + 1) * tgo^(gamma1 + 1);
+    phi2_bar = -1/(gamma2 + 1) * tgo^(gamma2 + 1);
+
+    phi1_hat = (tgo^(gamma1+2))/((gamma1+1)*(gamma1+2));
+    phi2_hat = (tgo^(gamma2+2))/((gamma2+1)*(gamma2+2));
+
+    delta = phi1_hat*phi2_bar - phi2_hat*phi1_bar;
+
+    if abs(delta) < 1e-10
+        c1 = 0;
+        c2 = 0;
+        return;
+    end
+
+    r_err = r - rf_star + vf_star*tgo - 0.5*(g + af_star)*tgo^2;
+    v_err = v - vf_star + (g + af_star)*tgo;
+
+    c1 = -(phi2_hat * v_err) + (phi2_bar * r_err);
+    c1 = c1/delta;
+    c2 = (phi1_hat * v_err) - (phi1_bar * r_err);
+    c2 = c2/delta;
+
+end
+%----------------------------------------------------------------------------------------------
+function dXdt = trajectory(t, X, gamma1, gamma2, tgo0, af_star, g, isp, c1, c2)
+    %r    = X(1:3);
+    V    = X(4:6);
+    mass    = X(7);
+    
+    tgo  = max(tgo0 - t, 0.001);
+    
+    % no computeCoefficients here!
+    aT = af_star + c1*tgo^gamma1 + c2*tgo^gamma2;
+    norm_aT = norm(aT);
+    F_mag = norm_aT * mass;
+    
+    dm_dt = -F_mag / (isp * (-g(3)));
+    dXdt = [V; aT+g; dm_dt];
+end
+
+%----------------------------------------------------------------------------------------------
+function I = simpsonIntegral(t, y)
+    % Simpson's 1/3 rule for numerical integration
+    
+    N = length(t) - 1;
+    if mod(N, 2) ~= 0
+        error("Simpson's rule requires an even number of intervals (odd number of points).");
+    end
+    
+    h = (t(end) - t(1)) / N;
+    I = y(1) + y(end) + 4*sum(y(2:2:end-1)) + 2*sum(y(3:2:end-2));
+    I = I * (h/3);
+end

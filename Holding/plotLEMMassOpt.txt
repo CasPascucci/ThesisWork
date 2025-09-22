@@ -1,0 +1,112 @@
+function plotLEMMassOpt(S)
+%PLOTLEMMASSOPT Produce the seven figures from the simulation results
+%   plotLEMMassOpt(S) where S is from runLEMMassOptOpenLoop
+
+    tTraj     = S.tTraj;
+    X         = S.stateTraj;
+    aTList    = S.aTList;
+    aT_norm   = S.aT_norm;
+    massList  = S.massList;
+
+    L_ref = S.refs.L_ref;
+    T_ref = S.refs.T_ref;
+    A_ref = S.refs.A_ref;
+    V_ref = S.refs.V_ref;
+    M_ref = S.refs.M_ref;
+
+    maxThrustDim = S.thrust.maxThrustDim;
+    minThrustDim = S.thrust.minThrustDim;
+
+    massInitDim = S.masses.massInitDim;
+    massDryDim  = S.masses.massDryDim;
+
+    % Figure 1: 3D trajectory colored by thrust accel magnitude
+    figure(); hold on;
+    scatter3(X(:,1)*L_ref/1000, X(:,2)*L_ref/1000, X(:,3)*L_ref/1000, 20, aT_norm*A_ref, 'filled');
+    xlabel('East (km)');
+    ylabel('North (km)');
+    zlabel('Up (km)');
+    title('3D Trajectory with Thrust Accel Magnitude');
+    grid on; view(45, 45);
+    subtitle(sprintf('gamma = %.4f\n kr = %.4f\n tgo = %.4f (s)',S.opt.gamma, S.opt.kr, S.opt.tgo*T_ref));
+    % z = 0 grid lines
+    % xGrid = -1:0.1:1; yGrid = -10:5:60; zGrid = 0;
+    % for i = 1:length(yGrid)
+    %     line(xGrid, yGrid(i)*ones(size(xGrid)), zGrid*ones(size(xGrid)), 'Color',[0.5 0.5 0.5], 'LineStyle','-');
+    % end
+    % for i = 1:length(xGrid)
+    %     line(xGrid(i)*ones(size(yGrid)), yGrid, zGrid*ones(size(yGrid)), 'Color',[0.5 0.5 0.5], 'LineStyle','-');
+    % end
+    colorbar; colormap(parula);
+    axis equal;
+
+    % Figure 2: 2D North-Up
+    figure(); hold on;
+    plot(X(:,2)*L_ref/1000, X(:,3)*L_ref/1000);
+    fprintf("Final X,Y: [%.3f, %.3f]\n",X(end,2),X(end,3))
+    xlabel('North km'); ylabel('Up km'); title('Range vs Altitude');
+    grid on; yline(0, 'Color', [1 0.2 0.2]);
+    subtitle(sprintf("East Error: %.2f m\n North Error: %.2f\n Up Error: %.2f", X(end,1)*L_ref, X(end,2)*L_ref, X(end,3)*L_ref));
+    
+
+    % Figure 3: Thrust acceleration components (ND)
+    % figure(); hold on;
+    % plot(tTraj, aTList(:,1), 'LineWidth', 1.5);
+    % plot(tTraj, aTList(:,2), 'LineWidth', 1.5);
+    % plot(tTraj, aTList(:,3), 'LineWidth', 1.5);
+    % plot(tTraj, vecnorm(aTList, 2, 2), '--', 'LineWidth', 2);
+    % legend('East', 'North', 'Up', 'Magnitude', 'Location', 'best');
+    % xlabel('ND Time'); ylabel('ND Accel'); title('Thrust Accel Profile (ND)');
+    % grid on;
+
+    % Figure 4: Thrust acceleration components (dimensional)
+    figure(); hold on;
+    plot(tTraj*T_ref, aTList(:,1)*A_ref, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, aTList(:,2)*A_ref, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, aTList(:,3)*A_ref, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, vecnorm(aTList, 2, 2)*A_ref, '-', 'LineWidth', 2);
+    legend('East', 'North', 'Up', 'Magnitude', 'Location', 'best');
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim)');
+    grid on;
+
+    % Figure 5: Velocity components (dimensional)
+    figure(); hold on;
+    plot(tTraj*T_ref, X(:,4)*V_ref, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, X(:,5)*V_ref, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, X(:,6)*V_ref, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, vecnorm([X(:,4), X(:,5), X(:,6)], 2, 2)*V_ref, '-', 'LineWidth', 2);
+    legend('East', 'North', 'Up', 'Magnitude', 'Location', 'best');
+    xlabel('Time s'); ylabel('Velocity m/s'); title('Velocity Profile (Dim)');
+    grid on;
+
+    % Figure 6: Throttle profile (display limits only)
+    figure(); hold on;
+    % Thrust magnitude = ||aT|| * m, dimensional thrust = a * m * A_ref * M_ref
+    thrustDim = vecnorm(aTList .* massList, 2, 2) * A_ref * M_ref;
+    plot(tTraj*T_ref, thrustDim / maxThrustDim,'DisplayName','Throttle Profile');
+    yline(1.0, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
+    yline(minThrustDim/maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
+    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle'); subtitle('Limits only for show, not applied to trajectory')
+    legend()
+
+    % Figure 7: Mass depletion over ND time
+    figure(); hold on;
+    plot(tTraj*T_ref, massList*M_ref, 'LineWidth', 2);
+    yline(massInitDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Initial');
+    yline(massDryDim, 'g--', 'LineWidth', 1, 'DisplayName', 'Dry');
+    xlabel('Time (s)'); ylabel('Mass (kg)'); title('Mass Depletion');
+    legend('Current', 'Initial', 'Dry', 'Location', 'northeast');
+    grid on;
+    subtitle(sprintf("Consumed Fuel: %.2f kg", massInitDim - massList(end)*M_ref));
+
+    %% Dimensional Plots
+
+    % Time vs Altituide
+    figure(); hold on;
+    plot(tTraj*T_ref, X(:,3) * L_ref, 'LineWidth', 1.5);
+    xlabel('Time s'); ylabel('Altitude m'); title('Time vs Altituide (Dimensional)');
+    grid on;
+
+    
+
+end
