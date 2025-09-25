@@ -112,59 +112,14 @@ elapsed = toc(tStart);
 fprintf("Finished sim in %.1f s\n", elapsed);
 fprintf("Gamma: %.4f, kr: %.4f, tgo: (%.4f) %.4f s \nCost: %.4f\n", optParams(1), optParams(2), optParams(3), optParams(3)*T_ref, optCost);
 
-%% Updated up to here only
+%% Closed Loop
 
-% Build a summary table
-idx_ok = find([Results.ok]);
-n_ok = numel(idx_ok);
+gamma = optParams(1);
+kr = optParams(2);
+tgo0 = optParams(3);
 
-fprintf("%d tests were OK out of the total %d tests\n", n_ok, numTests);
+Results = closedLoopSim(gamma,kr,tgo0, problemParams, nonDimParams, refVals);
 
-%Pre allocate
-gamma   = nan(numTests,1);
-kr      = nan(numTests,1);
-tgo     = nan(numTests,1);
-tgoVirt = nan(numTests,1);
-cost    = nan(numTests,1);
-prop_kg = nan(numTests,1);
-errMsg  = strings(numTests,1);
-
-for i = 1:numTests
-    if Results(i).ok %if ok, but so far all tests have been succesful, if it continues to do so then this if else can be removed
-        S = Results(i).S;
-        gamma(i)   = S.opt.gamma;
-        kr(i)      = S.opt.kr;
-        tgo(i)     = S.opt.tgo;
-        tgoVirt(i) = S.opt.tgoVirtual;
-        cost(i)    = S.opt.costEval;
-
-        % propellant used in kg
-        M_ref = S.refs.M_ref;            % equals massInitDim in current setup
-        massInitDim = S.masses.massInitDim;
-        mf_kg = S.stateTraj(end,7) * M_ref;
-        prop_kg(i) = massInitDim - mf_kg;
-    else
-        errMsg(i) = Results(i).err;
-    end
-end
-
-Summary = table(gamma, kr, tgo, tgoVirt, cost, prop_kg, errMsg); %Table helps for easy mass inspection
-Summary.x0_gamma = X0_all(:,1);
-Summary.x0_kr    = X0_all(:,2);
-Summary.x0_tgo   = X0_all(:,3);
-
-% Keep only successful rows for ranking, probably not necessary
-SummaryOK = Summary( [Results.ok].', : );
-SummaryOK = sortrows(SummaryOK, 'prop_kg');   % or 'cost'
-
-% 7) Save everything
-% ts = datestr(now, 'yyyymmdd_HHMMSS');
-% md = matlabdrive;
-% folder = "/Thesis Research/Batch Runs";
-% fname = ['LEM_batch_' ts '.mat'];
-% fullPath = fullfile(md, folder, fname);
-% save(fullPath, 'Summary', 'SummaryOK', 'Results', 'X0_all', 'cfg', 'elapsed');
-% fprintf('Saved batch to %s\n', fname);
 
 %% 8) Plotting
 % Run this section after loading desired results
