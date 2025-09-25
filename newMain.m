@@ -118,7 +118,7 @@ gamma = optParams(1);
 kr = optParams(2);
 tgo0 = optParams(3);
 
-Results = closedLoopSim(gamma,kr,tgo0, problemParams, nonDimParams, refVals);
+[tTraj, stateTraj] = closedLoopSim(gamma,kr,tgo0, problemParams, nonDimParams, refVals);
 
 
 %% 8) Plotting
