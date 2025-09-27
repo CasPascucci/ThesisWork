@@ -24,8 +24,8 @@ function newPlotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams
     tgoState = tgo0 - tTraj;
     tgoDim = tgoState * T_ref;
 
-    aTdim = aTList * A_ref;
-    aTNorm = vecnorm(aTdim,2,1);
+    aTDim = aTList * A_ref;
+    aTDimNorm = vecnorm(aTDim,2,1);
 
     rLanding = rMoon*U0;
     deltaR = rDim - rLanding';
@@ -39,11 +39,16 @@ function newPlotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams
     vN = vDim * N0;
     vU = vDim * U0;
 
-    aE = aTdim' * E0;
-    aN = aTdim' * N0;
-    aU = aTdim' * U0;
+    aE = aTDim' * E0;
+    aN = aTDim' * N0;
+    aU = aTDim' * U0;
     aT_ENU = [aE, aN, aU];
     aT_norm_ENU = vecnorm(aT_ENU,2,2);
+
+    maxThrustDim = problemParams.maxThrustDim;
+    minThrustDim = problemParams.minThrustDim;
+    massInitDim = problemParams.massInitDim;
+    massDryDim = problemParams.dryMassDim;
 
 
 
@@ -87,5 +92,41 @@ function newPlotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams
     plot(tTraj*T_ref, aT_norm_ENU, '-', 'LineWidth', 2);
     legend('East', 'North', 'Up', 'Magnitude', 'Location', 'best');
     xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim)');
+    grid on;
+
+% Figure 4: Velocity components (dimensional)
+    figure(); hold on;
+    plot(tTraj*T_ref, vE, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, vN, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, vU, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, vecnorm([stateTraj(:,4), stateTraj(:,5), stateTraj(:,6)], 2, 2)*V_ref, '-', 'LineWidth', 2);
+    legend('East', 'North', 'Up', 'Magnitude', 'Location', 'best');
+    xlabel('Time s'); ylabel('Velocity m/s'); title('Velocity Profile (Dim)');
+    grid on;
+
+% Figure 5: Throttle profile (display limits only)
+    figure(); hold on;
+    % Thrust magnitude = ||aT|| * m, dimensional thrust = a * m * A_ref * M_ref
+    thrustDim = aTDimNorm' .* mDim;%/maxThrustDim;
+    plot(tTraj*T_ref, thrustDim/maxThrustDim,'DisplayName','Throttle Profile');
+    yline(1.0, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
+    yline(minThrustDim/maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
+    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle'); subtitle('Limits only for show, not applied to trajectory')
+    legend()
+
+    % Figure 6: Mass depletion over ND time
+    figure(); hold on;
+    plot(tTraj*T_ref, mState*M_ref, 'LineWidth', 2);
+    yline(massInitDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Initial');
+    yline(massDryDim, 'g--', 'LineWidth', 1, 'DisplayName', 'Dry');
+    xlabel('Time (s)'); ylabel('Mass (kg)'); title('Mass Depletion');
+    legend('Current', 'Initial', 'Dry', 'Location', 'northeast');
+    grid on;
+    subtitle(sprintf("Consumed Fuel: %.2f kg", massInitDim - mState(end)*M_ref));
+
+    % Figure 7: Time vs Altituide
+    figure(); hold on;
+    plot(tTraj*T_ref, alt_m/1000, 'LineWidth', 1.5);
+    xlabel('Time s'); ylabel('Altitude m'); title('Time vs Altitude (Dimensional)');
     grid on;
 end

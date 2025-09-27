@@ -30,17 +30,14 @@ function [tTraj, stateTraj, aTList] = closedLoopSim(gamma,kr,tgo0, problemParams
          Mi = mState(idx);
          tgoi = tgoState(idx);
          gi = -(rMoonND^2) * Ri / (norm(Ri)^3);
-         if (tgoi * refVals.T_ref) > 0.5
+         
+         if (tgoi * refVals.T_ref) > 1
              aT1 = afStar + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afStar + gi);
              aT2 = ((gamma + 1) / tgoi)*(1 - kr/(gamma + 2))*(vfStar - Vi);
              aT3 = (rfStar - Ri - Vi*tgoi)* kr / tgoi^2;
              aTi = aT1 + aT2 + aT3;
          else
-             [rfVirtual, vfVirtual, afVirtual, tgoVirtual] = computeBeyondTerminationTargeting(Ri, Vi, gamma, kr, rfStar, vfStar, afStar, 1/refVals.T_ref, tgoi, gi);
-             aT1 = afVirtual + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afVirtual + gi);
-             aT2 = ((gamma + 1) / tgoVirtual)*(1 - kr/(gamma + 2))*(vfVirtual - Vi);
-             aT3 = (rfVirtual - Ri - Vi*tgoVirtual)* kr / tgoVirtual^2;
-             aTi = aT1 + aT2 + aT3;
+             aTi = aTi;
          end
          aTList(:,idx) = aTi;
      end
@@ -54,21 +51,17 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, 
     mass = X(7);
 
     g = -(rMoonND^2) * r / (norm(r)^3);
-    
+    persistent aT;
 
     tgo  = tgo0 - t;
     
-    if (tgo * T_ref) > 0.5    
+    if (tgo * T_ref) > 1    
         aT1 = afStar + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afStar + g);
         aT2 = ((gamma + 1) / tgo)*(1 - kr/(gamma + 2))*(vfStar - v);
         aT3 = (rfStar - r - v*tgo)* kr / tgo^2;
         aT = aT1 + aT2 + aT3;
     else
-        [rfVirtual, vfVirtual, afVirtual, tgoVirtual] = computeBeyondTerminationTargeting(r, v, gamma, kr, rfStar, vfStar, afStar, 1/T_ref, tgo, g);
-        aT1 = afVirtual + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afVirtual + g);
-        aT2 = ((gamma + 1) / tgoVirtual)*(1 - kr/(gamma + 2))*(vfVirtual - v);
-        aT3 = (rfVirtual - r - v*tgoVirtual)* kr / tgoVirtual^2;
-        aT = aT1 + aT2 + aT3;
+        aT = aT;
     end
     F_mag = norm(aT) * mass;
 

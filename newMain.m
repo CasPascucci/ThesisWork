@@ -120,7 +120,7 @@ tgo0 = optParams(3);
 
 [tTraj, stateTraj, aTList] = closedLoopSim(gamma,kr,tgo0, problemParams, nonDimParams, refVals);
 
-simCost = simpsonComp13Integral(tTraj,aTList);
+simCost = M_ref*(stateTraj(1,7) - stateTraj(end,7));
 fprintf("Sim Fuel Cost: %.4f kg\n",simCost);
 
 
