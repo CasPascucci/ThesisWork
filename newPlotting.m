@@ -78,4 +78,14 @@ function newPlotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams
     grid on; yline(0, 'Color', [1 0.2 0.2]);
     ylim([0,50]);
     subtitle(sprintf("East Error: %.2f m\n North Error: %.2f\n Up Error: %.2f", East(end), North(end), Up(end)));
+
+% Figure 3: Thrust acceleration components (dimensional)
+    figure(); hold on;
+    plot(tTraj*T_ref, aE, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, aN, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, aU, 'LineWidth', 1.5);
+    plot(tTraj*T_ref, aT_norm_ENU, '-', 'LineWidth', 2);
+    legend('East', 'North', 'Up', 'Magnitude', 'Location', 'best');
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim)');
+    grid on;
 end

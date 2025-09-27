@@ -30,17 +30,24 @@ function [tTraj, stateTraj, aTList] = closedLoopSim(gamma,kr,tgo0, problemParams
          Mi = mState(idx);
          tgoi = tgoState(idx);
          gi = -(rMoonND^2) * Ri / (norm(Ri)^3);
-
-         aT1 = afStar + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afStar + gi);
-         aT2 = ((gamma + 1) / tgoi)*(1 - kr/(gamma + 2))*(vfStar - Vi);
-         aT3 = (rfStar - Ri - Vi*tgoi)* kr / tgoi^2;
-         aTi = aT1 + aT2 + aT3;
+         if (tgoi * refVals.T_ref) > 0.5
+             aT1 = afStar + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afStar + gi);
+             aT2 = ((gamma + 1) / tgoi)*(1 - kr/(gamma + 2))*(vfStar - Vi);
+             aT3 = (rfStar - Ri - Vi*tgoi)* kr / tgoi^2;
+             aTi = aT1 + aT2 + aT3;
+         else
+             [rfVirtual, vfVirtual, afVirtual, tgoVirtual] = computeBeyondTerminationTargeting(Ri, Vi, gamma, kr, rfStar, vfStar, afStar, 1/refVals.T_ref, tgoi, gi);
+             aT1 = afVirtual + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afVirtual + gi);
+             aT2 = ((gamma + 1) / tgoVirtual)*(1 - kr/(gamma + 2))*(vfVirtual - Vi);
+             aT3 = (rfVirtual - Ri - Vi*tgoVirtual)* kr / tgoVirtual^2;
+             aTi = aT1 + aT2 + aT3;
+         end
          aTList(:,idx) = aTi;
      end
 end
 
 
-
+%% Functions
 function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, afStar, T_ref)
     r    = X(1:3);
     v    = X(4:6); 
@@ -57,7 +64,7 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, 
         aT3 = (rfStar - r - v*tgo)* kr / tgo^2;
         aT = aT1 + aT2 + aT3;
     else
-        [rfVirtual, vfVirtual, afVirtual, tgoVirtual] = computeBeyondTerminationTargeting(r, v, gamma, kr, rfStar, vfStar, afStar, 5/T_ref, tgo, g);
+        [rfVirtual, vfVirtual, afVirtual, tgoVirtual] = computeBeyondTerminationTargeting(r, v, gamma, kr, rfStar, vfStar, afStar, 1/T_ref, tgo, g);
         aT1 = afVirtual + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afVirtual + g);
         aT2 = ((gamma + 1) / tgoVirtual)*(1 - kr/(gamma + 2))*(vfVirtual - v);
         aT3 = (rfVirtual - r - v*tgoVirtual)* kr / tgoVirtual^2;
