@@ -74,7 +74,7 @@ function plotLEMMassOpt(S)
     ylim([min(North)/1000, max(North)/1000]);
     zlim([min(Up)/1000, max(Up)/1000]);
 
-    % Figure 2: Range vs Altitude
+% Figure 2: Range vs Altitude
     rhat = Rdim ./ vecnorm(Rdim,2,2);
     central = acos(rhat*U0);
     arcLength = RMoon * central;

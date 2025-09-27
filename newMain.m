@@ -110,7 +110,7 @@ tStart = tic;
 
 elapsed = toc(tStart);
 fprintf("Finished sim in %.1f s\n", elapsed);
-fprintf("Gamma: %.4f, kr: %.4f, tgo: (%.4f) %.4f s \nCost: %.4f\n", optParams(1), optParams(2), optParams(3), optParams(3)*T_ref, optCost);
+fprintf("Gamma: %.4f, kr: %.4f, tgo: (%.4f) %.4f s \nOpt Cost: %.4f\n", optParams(1), optParams(2), optParams(3), optParams(3)*T_ref, optCost);
 
 %% Closed Loop
 
@@ -118,52 +118,14 @@ gamma = optParams(1);
 kr = optParams(2);
 tgo0 = optParams(3);
 
-[tTraj, stateTraj] = closedLoopSim(gamma,kr,tgo0, problemParams, nonDimParams, refVals);
+[tTraj, stateTraj, aTList] = closedLoopSim(gamma,kr,tgo0, problemParams, nonDimParams, refVals);
+
+simCost = simpsonComp13Integral(tTraj,aTList);
+fprintf("Sim Fuel Cost: %.4f kg\n",simCost);
 
 
 %% 8) Plotting
-% Run this section after loading desired results
-
-% Find index of min propellant in the OK table
-[~, minRow] = min(SummaryOK.prop_kg);
-best = SummaryOK(minRow,:);
-
-% Find this row in the original Summary, same idx as Results
-% Probably unnecessary step if all tests are OK
-bestIdx = find(Summary.gamma == best.gamma & ...
-               Summary.kr    == best.kr & ...
-               Summary.tgo   == best.tgo, 1, 'first');
-
-if ~isempty(bestIdx) && Results(bestIdx).ok % Found a result and it actually ran
-    plotLEMMassOpt(Results(bestIdx).S);
-    fprintf('Plotted best run: gamma=%.4f, kr=%.4f, tgo=%.4f, prop=%.1f kg\n', ...
-        best.gamma, best.kr, best.tgo, best.prop_kg);
-else
-    warning('Best run not found in Results.');
-end
-
-
-[minGamma, maxGamma] = bounds(SummaryOK.gamma);
-rangeGamma = maxGamma - minGamma;
-[minkr, maxkr] = bounds(SummaryOK.kr);
-rangekr = maxkr - minkr;
-
-% Figure 8: Gamma vs Kr spread for batch runs
-figure(); hold on;
-scatter(SummaryOK.gamma, SummaryOK.kr,10)
-xscale('log');
-title('Gamma vs Kr');
-subtitle(sprintf('Gamma Spread: %.3e \n Kr Spread: %.3e', rangeGamma, rangekr));
-xlabel('Gamma');
-ylabel('Kr');
-
-%Figure 9: Case Number vs Dimensional Tgo
-figure();
-plot(1:numTests, Summary.tgo*S.refs.T_ref,'.','MarkerSize',30);
-title('Case Number vs Tgo (Dimensional)');
-xlabel('Case Number');
-ylabel('Tgo (seconds)');
-grid;
+newPlotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams, nonDimParams)
 
 
 % waitforbuttonpress;
