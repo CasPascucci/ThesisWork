@@ -1,8 +1,6 @@
-function [enu, alt] = MCMF2ENU(X, landingLatDeg, landingLonDeg, isVector, lunarRad_km)
+function [enu, alt] = MCMF2ENU(X, landingLatDeg, landingLonDeg, isVector)
 
-if nargin < 5 || isempty(lunarRad_km)
-    lunarRad_km = 1737.4; % Default value for lunar radius in kilometers
-end
+lunarRad_km = 1737.4; % Default value for lunar radius in kilometers
 
 Rm = lunarRad_km * 1000;
 
@@ -24,12 +22,4 @@ enu = [e; n; u];
 if nargout > 1 % Might be unnecessary, but this is only useful for radius calcs
     alt = vecnorm(X, 2, 1) - Rm;
 end
-end
-%% Helpers
-function [E, N, U] = enuBasis(lat, lon)
-    clat = cos(lat); slat = sin(lat);
-    clon = cos(lon); slon = sin(lon);
-    U = [clat*clon; clat*slon; slat];
-    E = [-slon; clon; 0];
-    N = [-slat*clon; -slat*slon; clat];
 end

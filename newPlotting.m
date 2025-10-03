@@ -90,7 +90,8 @@ function newPlotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams
     plot(tTraj*T_ref, aN, 'LineWidth', 1.5);
     plot(tTraj*T_ref, aU, 'LineWidth', 1.5);
     plot(tTraj*T_ref, aT_norm_ENU, '-', 'LineWidth', 2);
-    legend('East', 'North', 'Up', 'Magnitude', 'Location', 'best');
+    plot(tTraj(end)*T_ref,norm(nonDimParams.afStarND)*A_ref,'.','MarkerSize',10);
+    legend('East', 'North', 'Up', 'Magnitude','afStar', 'Location', 'best');
     xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim)');
     grid on;
 

@@ -3,7 +3,12 @@ function [tTraj, stateTraj, aTList] = closedLoopSim(gamma,kr,tgo0, problemParams
     r0 = nonDimParams.r0ND;
     v0 = nonDimParams.v0ND;
     m0 = nonDimParams.m0ND;
+    landingLatDeg = problemParams.landingLatDeg;
+    landingLonDeg = problemParams.landingLonDeg;
     
+    %gamma1 = 1;
+    %gamma2 = kr/(gamma+2) - 2;
+
     rMoonND = nonDimParams.rMoonND;
     isp = nonDimParams.ispND;
 
@@ -11,10 +16,14 @@ function [tTraj, stateTraj, aTList] = closedLoopSim(gamma,kr,tgo0, problemParams
     vfStar = nonDimParams.vfStarND;
     afStar = nonDimParams.afStarND;
 
+    rfStarENU = MCMF2ENU(rfStar,landingLatDeg,landingLonDeg,false);
+    vfStarENU = MCMF2ENU(vfStar,landingLatDeg,landingLonDeg,true);
+    afStarENU = MCMF2ENU(afStar,landingLatDeg,landingLonDeg,true);
+
     X0 = [r0; v0; m0];
     odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
      [tTraj, stateTraj] = ode45(@(t, X) trajectory(t, X, gamma, kr, ...
-                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref), [0, tgo0], X0, odeoptions);
+                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref, problemParams.landingLatDeg, problemParams.landingLonDeg), [0, tgo0], X0, odeoptions);
 
      rState = stateTraj(:,1:3);
      vState = stateTraj(:,4:6);
@@ -23,19 +32,27 @@ function [tTraj, stateTraj, aTList] = closedLoopSim(gamma,kr,tgo0, problemParams
 
      numStates = size(rState,1);
      aTList = zeros(3,numStates);
+     %cList = zeros(6,numStates);
 
      for idx = 1:numStates
          Ri = rState(idx, :).';
+         RiENU = MCMF2ENU(Ri,landingLatDeg, landingLonDeg,false);
          Vi = vState(idx, :).';
-         Mi = mState(idx);
+         ViENU = MCMF2ENU(Vi,landingLatDeg, landingLonDeg,true);
+         %Mi = mState(idx);
          tgoi = tgoState(idx);
          gi = -(rMoonND^2) * Ri / (norm(Ri)^3);
+         giENU = MCMF2ENU(gi,landingLatDeg, landingLonDeg,true);
          
-         if (tgoi * refVals.T_ref) > 1
-             aT1 = afStar + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afStar + gi);
-             aT2 = ((gamma + 1) / tgoi)*(1 - kr/(gamma + 2))*(vfStar - Vi);
-             aT3 = (rfStar - Ri - Vi*tgoi)* kr / tgoi^2;
+         if (tgoi * refVals.T_ref) > 0.8
+             aT1 = afStarENU + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afStarENU + giENU);
+             aT2 = ((gamma + 1) / tgoi)*(1 - kr/(gamma + 2))*(vfStarENU - ViENU);
+             aT3 = (rfStarENU - RiENU - ViENU*tgoi)* kr / tgoi^2;
              aTi = aT1 + aT2 + aT3;
+             %[c1, c2] = calculateCoeffs(Ri, Vi, tgoi, gamma1, gamma2, afStar, rfStar, vfStar, gi);
+             %aTi = afStar + c1 * tgoi^gamma1 + c2*tgoi^gamma2;
+             %aTi = afStar + c2 + c1*tgoi;
+             %cList(:,idx) = [c1;c2];
          else
              aTi = aTi;
          end
@@ -45,24 +62,38 @@ end
 
 
 %% Functions
-function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, afStar, T_ref)
+function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, afStar, T_ref, landingLat, landingLon)
     r    = X(1:3);
-    v    = X(4:6); 
+    rENU = MCMF2ENU(r,landingLat,landingLon,false);
+    v    = X(4:6);
+    vENU = MCMF2ENU(v,landingLat,landingLon,true);
     mass = X(7);
+    
+
+    rfStarENU = MCMF2ENU(rfStar,landingLat,landingLon,false);
+    vfStarENU = MCMF2ENU(vfStar,landingLat,landingLon,true);
+    %gamma1 = 1;
+    %gamma2 = kr/(gamma+2) - 2;
 
     g = -(rMoonND^2) * r / (norm(r)^3);
+    gENU = MCMF2ENU(g,landingLat,landingLon,true);
+    afStarENU = MCMF2ENU(afStar,landingLat,landingLon,true);
     persistent aT;
 
     tgo  = tgo0 - t;
     
-    if (tgo * T_ref) > 1    
-        aT1 = afStar + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afStar + g);
-        aT2 = ((gamma + 1) / tgo)*(1 - kr/(gamma + 2))*(vfStar - v);
-        aT3 = (rfStar - r - v*tgo)* kr / tgo^2;
+    if (tgo * T_ref) > 0.8
+        aT1 = (afStarENU + gENU) * ((gamma*kr/(2*gamma+4)) - gamma - 1) + afStarENU;
+        aT2 = ((gamma + 1) / tgo)*(1 - (kr/(gamma + 2)))*(vfStarENU - vENU);
+        aT3 = (rfStarENU - rENU - vENU*tgo)* kr / tgo^2;
         aT = aT1 + aT2 + aT3;
+        %[c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, afStar, rfStar, vfStar, g);
+        %aT = afStar + c1*tgo^gamma1 + c2*tgo^gamma2;
     else
         aT = aT;
     end
+    aT = ENU2MCMF(aT,landingLat,landingLon,true);
+    
     F_mag = norm(aT) * mass;
 
     dm_dt = -F_mag / (isp);

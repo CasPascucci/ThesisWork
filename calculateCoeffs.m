@@ -1,4 +1,4 @@
-function [c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, af_star, rfStar, vfStar, gConst)
+function [c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, afStar, rfStar, vfStar, g)
     phi1_bar = -1/(gamma1 + 1) * tgo^(gamma1 + 1);
     phi2_bar = -1/(gamma2 + 1) * tgo^(gamma2 + 1);
 
@@ -9,13 +9,13 @@ function [c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, af_star, rfStar, 
 
 
     if abs(delta) < 1e-10
-        c1 = 0;
-        c2 = 0;
+        c1 = [0;0;0];
+        c2 = [0;0;0];
         return;
     end
 
-    r_err = r - rfStar + vfStar*tgo - 0.5*(gConst + af_star)*tgo^2;
-    v_err = v - vfStar + (gConst + af_star)*tgo;
+    r_err = r - rfStar + vfStar*tgo - 0.5*(g + afStar)*tgo^2;
+    v_err = v - vfStar + (g + afStar)*tgo;
 
     c1 = ( -phi2_hat * v_err +  phi2_bar * r_err) / delta;
     c2 = (  phi1_hat * v_err -  phi1_bar * r_err) / delta;
