@@ -7,7 +7,6 @@ function [c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, afStar, rfStar, v
 
     delta = phi1_hat*phi2_bar - phi2_hat*phi1_bar;
 
-
     if abs(delta) < 1e-10
         c1 = [0;0;0];
         c2 = [0;0;0];

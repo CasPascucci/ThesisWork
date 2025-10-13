@@ -1,13 +1,11 @@
 function [tTraj, stateTraj, aTList] = closedLoopSim(gamma,kr,tgo0, problemParams, nonDimParams, refVals)
 
+    
     r0 = nonDimParams.r0ND;
     v0 = nonDimParams.v0ND;
     m0 = nonDimParams.m0ND;
-    landingLatDeg = problemParams.landingLatDeg;
-    landingLonDeg = problemParams.landingLonDeg;
-    
-    %gamma1 = 1;
-    %gamma2 = kr/(gamma+2) - 2;
+    landingLat = problemParams.landingLatDeg;
+    landingLon = problemParams.landingLonDeg;
 
     rMoonND = nonDimParams.rMoonND;
     isp = nonDimParams.ispND;
@@ -16,86 +14,84 @@ function [tTraj, stateTraj, aTList] = closedLoopSim(gamma,kr,tgo0, problemParams
     vfStar = nonDimParams.vfStarND;
     afStar = nonDimParams.afStarND;
 
-    rfStarENU = MCMF2ENU(rfStar,landingLatDeg,landingLonDeg,false);
-    vfStarENU = MCMF2ENU(vfStar,landingLatDeg,landingLonDeg,true);
-    afStarENU = MCMF2ENU(afStar,landingLatDeg,landingLonDeg,true);
+    %delta_t = 0.0381837661840736; % 3s
+
+    gConst = nonDimParams.gConst;
+
+    
 
     X0 = [r0; v0; m0];
     odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
      [tTraj, stateTraj] = ode45(@(t, X) trajectory(t, X, gamma, kr, ...
-                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref, problemParams.landingLatDeg, problemParams.landingLonDeg), [0, tgo0], X0, odeoptions);
+                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref, landingLat, landingLon, refVals, gConst), [0, tgo0], X0, odeoptions);
 
      rState = stateTraj(:,1:3);
      vState = stateTraj(:,4:6);
-     mState = stateTraj(:,7);
      tgoState = tgo0 - tTraj;
 
      numStates = size(rState,1);
      aTList = zeros(3,numStates);
-     %cList = zeros(6,numStates);
+     aTNormList = zeros(1,numStates);
+
+
 
      for idx = 1:numStates
-         Ri = rState(idx, :).';
-         RiENU = MCMF2ENU(Ri,landingLatDeg, landingLonDeg,false);
-         Vi = vState(idx, :).';
-         ViENU = MCMF2ENU(Vi,landingLatDeg, landingLonDeg,true);
-         %Mi = mState(idx);
-         tgoi = tgoState(idx);
-         gi = -(rMoonND^2) * Ri / (norm(Ri)^3);
-         giENU = MCMF2ENU(gi,landingLatDeg, landingLonDeg,true);
+         r = rState(idx, :).';
+         v = vState(idx, :).';
+         tgo = tgoState(idx);
+         gGuidance = gConst;
          
-         if (tgoi * refVals.T_ref) > 0.8
-             aT1 = afStarENU + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afStarENU + giENU);
-             aT2 = ((gamma + 1) / tgoi)*(1 - kr/(gamma + 2))*(vfStarENU - ViENU);
-             aT3 = (rfStarENU - RiENU - ViENU*tgoi)* kr / tgoi^2;
-             aTi = aT1 + aT2 + aT3;
-             %[c1, c2] = calculateCoeffs(Ri, Vi, tgoi, gamma1, gamma2, afStar, rfStar, vfStar, gi);
-             %aTi = afStar + c1 * tgoi^gamma1 + c2*tgoi^gamma2;
-             %aTi = afStar + c2 + c1*tgoi;
-             %cList(:,idx) = [c1;c2];
+         if (tgo * refVals.T_ref) > 0.3
+             aT1 = gamma*(kr/(2*gamma +4) -1)*afStar;
+             aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
+             aT3 = ((gamma+1)/tgo)*(1-kr/(gamma+2))*(vfStar-v);
+             aT4 = (kr/tgo^2)*(rfStar-r-v*tgo);
+             aTi = aT1 + aT2 + aT3 + aT4;
          else
-             aTi = aTi;
+             aTi = aTList(:,idx-1);
          end
          aTList(:,idx) = aTi;
+         aTNormList(idx) = norm(aTi);
      end
 end
 
 
 %% Functions
-function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, afStar, T_ref, landingLat, landingLon)
+function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, afStar, T_ref, landingLat, landingLon, refVals, gConst)
     r    = X(1:3);
-    rENU = MCMF2ENU(r,landingLat,landingLon,false);
     v    = X(4:6);
-    vENU = MCMF2ENU(v,landingLat,landingLon,true);
     mass = X(7);
     
-
-    rfStarENU = MCMF2ENU(rfStar,landingLat,landingLon,false);
-    vfStarENU = MCMF2ENU(vfStar,landingLat,landingLon,true);
-    %gamma1 = 1;
-    %gamma2 = kr/(gamma+2) - 2;
-
     g = -(rMoonND^2) * r / (norm(r)^3);
-    gENU = MCMF2ENU(g,landingLat,landingLon,true);
-    afStarENU = MCMF2ENU(afStar,landingLat,landingLon,true);
+    gGuidance = gConst;
+
     persistent aT;
 
     tgo  = tgo0 - t;
     
-    if (tgo * T_ref) > 0.8
-        aT1 = (afStarENU + gENU) * ((gamma*kr/(2*gamma+4)) - gamma - 1) + afStarENU;
-        aT2 = ((gamma + 1) / tgo)*(1 - (kr/(gamma + 2)))*(vfStarENU - vENU);
-        aT3 = (rfStarENU - rENU - vENU*tgo)* kr / tgo^2;
-        aT = aT1 + aT2 + aT3;
-        %[c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, afStar, rfStar, vfStar, g);
-        %aT = afStar + c1*tgo^gamma1 + c2*tgo^gamma2;
+    if (tgo * T_ref) > 0.3
+        % aT1 = afStar + (afStar + g)*(gamma*kr/(2*(gamma+2)) - gamma - 1);
+        % aT2 = ((gamma + 1) / tgo)*(1 - (kr/(gamma + 2)))*(vfStar - v);
+        % aT3 = (rfStar - r - v*tgo)* kr / tgo^2;
+        % aT = aT1 + aT2 + aT3;
+        aT1 = gamma*(kr/(2*gamma +4) -1)*afStar;
+        aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
+        aT3 = ((gamma+1)/tgo)*(1-kr/(gamma+2))*(vfStar-v);
+        aT4 = (kr/tgo^2)*(rfStar-r-v*tgo);
+        aT = aT1 + aT2 + aT3 + aT4;
+        
     else
         aT = aT;
+
+        %[rfVirtual, vfVirtual, afVirtual, ~] = computeBeyondTerminationTargeting(r, v, gamma, kr, rfStar, vfStar, afStar, delta_t, tgo, g);
+        %tgo = tgo + delta_t;
+        %aT1 = afVirtual + (( (gamma*kr) / (2*(gamma + 2)) ) - gamma - 1)*(afVirtual + g);
+        %aT2 = ((gamma + 1) / tgo)*(1 - (kr/(gamma + 2)))*(vfVirtual - v);
+        %aT3 = (rfVirtual - r - v*tgo)* kr / tgo^2;
+        %aT = aT1 + aT2 + aT3;
     end
-    aT = ENU2MCMF(aT,landingLat,landingLon,true);
     
     F_mag = norm(aT) * mass;
-
     dm_dt = -F_mag / (isp);
     dXdt = [v; aT + g; dm_dt];
 end
@@ -105,14 +101,10 @@ function [rfVirtual, vfVirtual, afVirtual, tgoVirtual] = computeBeyondTerminatio
     rfStar = rfStar(:); vfStar = vfStar(:); afStar = afStar(:);
 
     if gamma < 0, error('gamma must be >= 0'); end
-    if kr < 2*(gamma + 2), error('kr must be >= 2*(gamma+2)'); end
+    if kr <= 2*(gamma + 2), error('kr must be > 2*(gamma+2)'); end
 
     tgoVirtual = tgo_true + delta_t;
-    if delta_t < 1e-15
-        rfVirtual = rfStar; vfVirtual = vfStar; afVirtual = afStar;
-        tgoVirtual = tgo_true;
-        return;
-    end
+    
 
     gamma1 = gamma;
     gamma2 = kr/(gamma + 2) - 2;
@@ -130,8 +122,8 @@ function [rfVirtual, vfVirtual, afVirtual, tgoVirtual] = computeBeyondTerminatio
     phi1_hat = tgo^(gamma1 + 2) / ((gamma1 + 1)*(gamma1 + 2));
     phi2_hat = tgo^(gamma2 + 2) / ((gamma2 + 1)*(gamma2 + 2));
     delta = phi1_hat * phi2_bar - phi2_hat * phi1_bar;
-    
-    
+
+
     %fprintf("Value of tgo^(gamma1+1): %.5f, Value of tgo^(gamma2+1): %.5f\n",tgo^(gamma1+1),tgo^(gamma2+1));
 
     k1r = -phi2_bar / delta;

@@ -1,10 +1,11 @@
+%% Optimized Fractional Polynomial Guidance
 clear; clc; close all;
 addpath([pwd, '/CoordinateFunctions']);
-% Fractional-Polynomial Parameter IC guesses, currently at the optim for
-% e-guidance
-gamma_test = 1.0;
-kr_test = 6.001;
-tgo_test = 9.7025;
+
+gamma_test = 2;
+kr_test = 12.001;
+tgo_test = 10;
+
 
 %% PDI Conditions
 altitude_km        = 15.24;
@@ -16,9 +17,17 @@ inertialVelocity   = 1698.3;
 flightPathAngleDeg = 0;
 
 %Convert PDI initial conditions into the MCMF frame of the problem
-[r0Dim, v0Dim] = PDI2MCMF(altitude_km, lonInitDeg, latInitDeg, ...
-                                   landingLonDeg, landingLatDeg, ...
-                                   inertialVelocity, flightPathAngleDeg);
+% [r0Dim, v0Dim] = PDI2MCMF(altitude_km, lonInitDeg, latInitDeg, ...
+%                                    landingLonDeg, landingLatDeg, ...
+%                                    inertialVelocity, flightPathAngleDeg);
+
+r0Dim = [411608.123492225;
+         368665.998391003;
+         -1659817.39432084];
+
+v0Dim = [-1195.85903735503;
+         -1073.07538948840;
+         -536.193540835963];
 
 % Gives us the ENU vectors to base the local frame off of
 [E0, N0, U0] = enuBasis(deg2rad(landingLatDeg),deg2rad(landingLonDeg));
@@ -26,8 +35,8 @@ flightPathAngleDeg = 0;
 %% Problem Params
 
 
-rMoon = 1737.4 * 1000; % m
-gMoon = 1.62; % m/s^2
+rMoon = 1736.01428 * 1000; % m
+gMoon = 1.622; % m/s^2
 g0 = 9.81; % m/s^2
 
 rfDim = rMoon * U0;
@@ -42,7 +51,31 @@ ispDim = 311; % s
 maxThrustDim = 45000; % N
 minThrustDim = 4500; % N
 
-% Struct to pass into optimizer
+%% NonDimensionalization
+
+L_ref = 10000; % m
+T_ref = sqrt(L_ref/gMoon); % m/s
+A_ref = gMoon;
+V_ref = L_ref / T_ref;
+M_ref = 15103.0; % This should always be the original MInit, keeps scaling consistent as problem evolves
+
+
+rMoonND  = rMoon / L_ref;
+r0ND = r0Dim / L_ref;
+v0ND = v0Dim / V_ref;
+rfStarND = rfDim / L_ref;
+vfStarND = vfDim / V_ref;
+afStarND = afDim / A_ref;
+gConst = -(rMoonND^2) * rfStarND / (norm(rfStarND)^3); % Constant landing site gravity
+m0ND = massInitDim / M_ref;
+mMinND = dryMassDim / M_ref;
+ispND = ispDim * g0 / (V_ref);
+maxThrustND = maxThrustDim/(M_ref*A_ref);
+minThrustND = minThrustDim/(M_ref*A_ref);
+
+%% Create Structs to be Passed Along
+
+% Problem Parameters Struct
 problemParams = struct;
 problemParams.E0 = E0;
 problemParams.N0 = N0;
@@ -62,27 +95,8 @@ problemParams.maxThrustDim = maxThrustDim; % N
 problemParams.minThrustDim = minThrustDim; % N
 problemParams.landingLatDeg = landingLatDeg;
 problemParams.landingLonDeg = landingLonDeg;
-%% NonDimensionalization
 
-L_ref = 10000; % m
-T_ref = sqrt(L_ref/gMoon); % m/s
-A_ref = gMoon;
-V_ref = L_ref / T_ref;
-M_ref = 15103.0; % This should always be the original MInit, keeps scaling consistent as problem evolves
-
-
-rMoonND  = rMoon / L_ref;
-r0ND = r0Dim / L_ref;
-v0ND = v0Dim / V_ref;
-rfStarND = rfDim / L_ref;
-vfStarND = vfDim / V_ref;
-afStarND = afDim / A_ref;
-gConst = -(rMoonND^2) * rfStarND / (norm(rfStarND)^3); % Constant landing site gravity
-m0ND = massInitDim / M_ref;
-mMinND = dryMassDim / M_ref;
-ispND = ispDim * g0 / (A_ref * T_ref);
-
-% Struct to pass into optimizer
+% Reference Values for Non-Dim
 refVals = struct;
 refVals.L_ref = L_ref;
 refVals.T_ref = T_ref;
@@ -90,7 +104,7 @@ refVals.A_ref = A_ref;
 refVals.V_ref = V_ref;
 refVals.M_ref = M_ref;
 
-% Struct to pass into optimizer
+% Non dimensional parameters
 nonDimParams = struct;
 nonDimParams.rMoonND = rMoonND;
 nonDimParams.r0ND = r0ND;
@@ -102,6 +116,8 @@ nonDimParams.gConst = gConst;
 nonDimParams.m0ND = m0ND;
 nonDimParams.mMinND = mMinND;
 nonDimParams.ispND = ispND;
+nonDimParams.maxThrustND = maxThrustND;
+nonDimParams.minThrustND = minThrustND;
 
 %% 
 paramsX0 = [gamma_test,kr_test,tgo_test]; % Now tgo is nondim
@@ -112,7 +128,7 @@ paramsX0 = [gamma_test,kr_test,tgo_test]; % Now tgo is nondim
 
 %elapsed = toc(tStart);
 %fprintf("Finished sim in %.1f s\n", elapsed);
-fprintf("Gamma: %.4f, kr: %.4f, tgo: (%.4f) %.4f s \nOpt Estimated Cost: %.4f\n", optParams(1), optParams(2), optParams(3), optParams(3)*T_ref, optCost);
+fprintf("Gamma: %.4f, kr: %.4f, tgo: (%.4f) %.4f s \nOpt Estimated Cost: %.4f\n", optParams(1), optParams(2), optParams(3), optParams(3)*T_ref, optCost*M_ref);
 
 %% Closed Loop
 
@@ -127,8 +143,7 @@ fprintf("Closed Loop Sim Fuel Cost: %.4f kg\n",simCost);
 
 
 %% 8) Plotting
-newPlotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams, nonDimParams)
-
+plotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams, nonDimParams)
 
 
 
