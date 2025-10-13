@@ -24,15 +24,15 @@ function [optParams, optCost] = optimizationLoop(paramsX0, problemParams, nonDim
         %ub = [1.0, 6, 9.70848233443312];
     % E-Guidance Test
         lb = [0, 0, 3];
-        ub = [1, 18, 11];
+        ub = [7, 18, 11];
 
     fminconOptions = optimoptions('fmincon', 'Display', 'iter-detailed', 'MaxFunctionEvaluations', 5000, ...
         'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-6, ...
-        'Algorithm','sqp','OptimalityTolerance', 1e-6, 'EnableFeasibilityMode',true);
+        'Algorithm','interior-point','OptimalityTolerance', 1e-6, 'EnableFeasibilityMode',true);
 
 
     obj = @(params) objectiveFunction(params, afStar, rfStar, r0, vfStar, v0, gConst, nonDimParams);
-    nonlincon = @(params) thrustLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust);
+    nonlincon = @(params) thrustLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust,nonDimParams.rMoonND);
 
     [optParams, optCost] = fmincon(obj, paramsX0, Aineq, bineq, [], [], lb, ub, nonlincon, fminconOptions);
     
@@ -68,7 +68,7 @@ function cost = objectiveFunction(params, afStar, rfStar, r, vfStar, v, gConst, 
 
 end
 
-function [c, ceq] = thrustLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust)
+function [c, ceq] = thrustLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, rMoonND)
     gamma  = params(1);
     kr     = params(2);
     tgo   = params(3);
@@ -89,8 +89,12 @@ function [c, ceq] = thrustLimits(params, r0, v0, rfStar, vfStar, afStar, gConst,
 
     m = m0 .* exp(-Q);
     m = flip(m);
+    
+    % Test delta_g for throttle limits
+    gInit = -(rMoonND^2) * r0 / (norm(r0)^3);
+    deltaG = abs(gInit-gConst);
 
-    thrust = m .*aTmag;
+    thrust = m .*(aTmag+deltaG);
 
     upper = thrust - maxThrust;
     lower = minThrust - thrust;

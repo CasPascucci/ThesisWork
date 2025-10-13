@@ -1,5 +1,5 @@
 % Plotting function
-function plotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams, nonDimParams)
+function plotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams, nonDimParams, flag_thrustGotLimited)
     
     gamma = optParams(1);
     kr = optParams(2);
@@ -113,6 +113,10 @@ function plotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams, n
     %xline(tgo0Dim-3, 'r--','LineWidth',1); % Line 3 seconds before, when BTT kicks in ( if enabled and set to 3 seconds)
     legend('X', 'Y', 'Z', 'Magnitude','afStar','1g', '3g', 'Location', 'best');
     xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim) in MCMF frame');
+    if flag_thrustGotLimited
+        subtitle("Thrust is being Throttled");
+        fprintf("Thrust is being Throttled");
+    end
     grid on;
 
 % Figure 5: Velocity components (dimensional)

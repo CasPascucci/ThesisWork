@@ -2,7 +2,7 @@
 clear; clc; close all;
 addpath([pwd, '/CoordinateFunctions']);
 
-gamma_test = 2;
+gamma_test = 1;
 kr_test = 12.001;
 tgo_test = 10;
 
@@ -136,21 +136,21 @@ gamma = optParams(1);
 kr = optParams(2);
 tgo0 = optParams(3);
 
-[tTraj, stateTraj, aTList] = closedLoopSim(gamma, kr, tgo0, problemParams, nonDimParams, refVals);
+[tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma, kr, tgo0, problemParams, nonDimParams, refVals);
 
 simCost = M_ref*(stateTraj(1,7) - stateTraj(end,7));
 fprintf("Closed Loop Sim Fuel Cost: %.4f kg\n",simCost);
 
 
 %% 8) Plotting
-plotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams, nonDimParams)
+plotting(tTraj, stateTraj, optParams, aTList, refVals, problemParams, nonDimParams, flag_thrustGotLimited)
 
 
 
 
 
 
-
+%% Old figure saving code, unused currently but kept for future reference
 % waitforbuttonpress;
 % for i = 1:7
 %     fig = figure(i);
