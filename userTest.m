@@ -27,15 +27,21 @@ targetState.landingLatDeg      = -90.0;
 targetState.rfLanding = [0;0;0];
 targetState.vfLanding = [0;0;-1];
 targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
-%targetState.afLanding = [0;0;vehicleParams.maxThrust/(6710)];
+%targetState.afLanding = [0;0;vehicleParams.maxThrust/(6710)]; % This
+                                                               %afStar seems to be too high for a solvable path
 targetState.delta_t   = 5; % seconds dim, for btt
 
+optimParams = struct;
+optimParams.nodeCount = 997;
+optimParams.glideSlopeFinalTheta = 45;
 
 
 
-[gammaOpt, krOpt, tgoOpt, fuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, 1, true);
+
+[gammaOpt, krOpt, tgoOpt, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimParams, 0.65, true);
 % Print Values
 gammaOpt
 krOpt
 tgoOpt
-fuelCost
+optFuelCost
+simFuelCost
