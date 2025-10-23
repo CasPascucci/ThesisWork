@@ -1,4 +1,4 @@
-function [optParams, optCost, aTOptim, mOptim] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, refVals, delta_t)
+function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, refVals, delta_t)
 
     r0 = nonDimParams.r0ND;
     v0 = nonDimParams.v0ND;

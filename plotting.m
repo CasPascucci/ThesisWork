@@ -1,5 +1,5 @@
 % Plotting function
-function plotting(tTraj, stateTraj, optParams, aTOptim, aTList, refVals, problemParams, nonDimParams, flag_thrustGotLimited)
+function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, flag_thrustGotLimited)
     
     gamma = optParams(1);
     kr = optParams(2);

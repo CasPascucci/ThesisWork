@@ -159,7 +159,7 @@ nonDimParams.minThrustND = minThrustND;
 %% Optimization
 paramsX0 = [1, 6.5, 6];
 
-[optParams, optCost, aTOptim, mOptim] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, refVals, delta_tND);
+[optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, refVals, delta_tND);
 gammaOpt = optParams(1);
 krOpt = optParams(2);
 tgoOpt = optParams(3) * T_ref;
@@ -168,7 +168,7 @@ tgoOpt = optParams(3) * T_ref;
         [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gammaOpt, krOpt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
         fuelCost = M_ref*(stateTraj(1,7) - stateTraj(end,7));
         if doPlots
-            plotting(tTraj, stateTraj, optParams, aTOptim, aTList, refVals, problemParams, nonDimParams, flag_thrustGotLimited);
+            plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, flag_thrustGotLimited);
         end
     end
 end
