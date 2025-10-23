@@ -159,7 +159,7 @@ nonDimParams.minThrustND = minThrustND;
 %% Optimization
 paramsX0 = [1, 6.5, 6];
 
-[optParams, optCost, aTOptim] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, refVals, delta_tND);
+[optParams, optCost, aTOptim, mOptim] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, refVals, delta_tND);
 gammaOpt = optParams(1);
 krOpt = optParams(2);
 tgoOpt = optParams(3) * T_ref;

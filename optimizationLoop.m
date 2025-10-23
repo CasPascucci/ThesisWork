@@ -1,4 +1,4 @@
-function [optParams, optCost, aTOptim] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, refVals, delta_t)
+function [optParams, optCost, aTOptim, mOptim] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, refVals, delta_t)
 
     r0 = nonDimParams.r0ND;
     v0 = nonDimParams.v0ND;
@@ -45,17 +45,36 @@ function [optParams, optCost, aTOptim] = optimizationLoop(paramsX0, betaParam, p
 
     aTOptim = afStar + c1*tgospan.^gamma1 + c2*tgospan.^gamma2;
 
+    phi1hat = (tgospan.^(gamma1+2))./((gamma1+1)*(gamma1+2));
+    phi2hat = (tgospan.^(gamma2+2))./((gamma2+1)*(gamma2+2));
+    phi1bar = (tgospan.^gamma1+1)./(gamma1+1);
+    phi2bar = (tgospan.^gamma2+1)./(gamma2+1);
+
+    rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospan + 0.5*(gConst+afStar).*tgospan.^2;
+    vdOptim = vfStar + c1*phi1bar + c2*phi2bar -(gConst+afStar).*tgospan;
+
+    rdOptimTopo = MCMF2ENU(rdOptim,problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
+    vdOptimTopo = MCMF2ENU(vdOptim,problemParams.landingLatDeg,problemParams.landingLonDeg,false,false);
+
+    figure(); hold on;
+    plot(tspan*refVals.T_ref, rdOptimTopo*refVals.L_ref);
+    legend('E','N','U');
+
+    figure(); hold on;
+    plot(tspan*refVals.T_ref, vdOptimTopo*refVals.V_ref);
+    legend('E','N','U');
+
     aTNorm = vecnorm(aTOptim,2,1);
 
     Q = cumtrapz(tgospan,aTNorm./isp);
     Q = Q(end) - Q;
 
-    m = 1 .* exp(-Q);
+    mOptim = 1 .* exp(-Q);
     %m = flip(m);
 
     figure(); hold on;
     % Thrust magnitude = ||aT|| * m, dimensional thrust = a * m * A_ref * M_ref
-    thrustDim = aTNorm .* m *(refVals.M_ref*refVals.A_ref);
+    thrustDim = aTNorm .* mOptim *(refVals.M_ref*refVals.A_ref);
     plot(tspan*refVals.T_ref, thrustDim/problemParams.maxThrustDim,'DisplayName','Throttle Profile');
     yline(1.0, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
     yline(problemParams.minThrustDim/problemParams.maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
