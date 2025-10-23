@@ -57,26 +57,26 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
                  aT3 = ((gamma+1)/tgoVirt)*(1-kr/(gamma+2))*(vfVirtual-v);
                  aT4 = (kr/tgoVirt^2)*(rfVirtual-r-v*tgoVirt);
                  aTi = aT1 + aT2 + aT3 + aT4;
-                 % if norm(aTi) > maxAccel
-                 %     aTi = aTi / norm(aTi) * maxAccel;
-                 %     flag_thrustGotLimited = true;
-                 % elseif norm(aTi) < minAccel
-                 %     aTi = aTi / norm(aTi) * minAccel;
-                 %     flag_thrustGotLimited = true;
-                 % end
+                 if norm(aTi) > maxAccel
+                     aTi = aTi / norm(aTi) * maxAccel;
+                     flag_thrustGotLimited = true;
+                 elseif norm(aTi) < minAccel
+                     aTi = aTi / norm(aTi) * minAccel;
+                     flag_thrustGotLimited = true;
+                 end
              else
                  aT1 = gamma*(kr/(2*gamma +4) -1)*afVirtual;
                  aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
                  aT3 = ((gamma+1)/tgoVirt)*(1-kr/(gamma+2))*(vfVirtual-v);
                  aT4 = (kr/tgoVirt^2)*(rfVirtual-r-v*tgoVirt);
                  aTi = aT1 + aT2 + aT3 + aT4;
-                 % if norm(aTi) > maxAccel
-                 %     aTi = aTi / norm(aTi) * maxAccel;
-                 %     flag_thrustGotLimited = true;
-                 % elseif norm(aTi) < minAccel
-                 %     aTi = aTi / norm(aTi) * minAccel;
-                 %     flag_thrustGotLimited = true;
-                 % end
+                 if norm(aTi) > maxAccel
+                     aTi = aTi / norm(aTi) * maxAccel;
+                     flag_thrustGotLimited = true;
+                 elseif norm(aTi) < minAccel
+                     aTi = aTi / norm(aTi) * minAccel;
+                     flag_thrustGotLimited = true;
+                 end
              end
          else    % No BTT
              if (tgo * refVals.T_ref) > 0.2

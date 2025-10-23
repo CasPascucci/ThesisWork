@@ -1,5 +1,6 @@
 clear all; close all; clc; format short
-%% Test function to see user experience for runthisFunc function calls
+%% Test function to see user experience for getParams() function calls
+% All values are dimensional
 PDIState = struct;
 PDIState.altitude_km        = 15.24;
 PDIState.lonInitDeg         = 41.85;

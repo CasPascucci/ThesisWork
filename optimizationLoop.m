@@ -128,6 +128,6 @@ function [c, ceq] = thrustLimits(params, r0, v0, rfStar, vfStar, afStar, gConst,
     lower = minThrust - thrust;
 
     c = [upper(:); lower(:)];
-    max(c)
+    %max(c)
     ceq = [];
 end
