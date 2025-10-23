@@ -51,25 +51,37 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     massInitDim = problemParams.massInitDim;
     massDryDim = problemParams.dryMassDim;
 %% Optim Figures
+    aTOptim = aTOptim';
+    rdOptim = rdOptim';
+    vdOptim = vdOptim';
+    mOptim = mOptim';
 
-    % tspanOpt = linspace(0,tTraj(end),997);
-    % aTNormOpt = vecnorm(aTOptim,2,1);
-    % aTNormOpt = flip(aTNormOpt);
-    % 
-    % Q = cumtrapz(tspanOpt,aTNormOpt./isp);
-    % Q = Q(end) - Q;
-    % 
-    % mOpt = 1 .* exp(-Q);
-    % mOpt = flip(mOpt);
-    % 
-    % figure('Name','Opt Throttle'); hold on;
-    % % Thrust magnitude = ||aT|| * m, dimensional thrust = a * m * A_ref * M_ref
-    % thrustDim = aTNormOpt .* mOpt *(refVals.M_ref*refVals.A_ref);
-    % plot(tspanOpt*T_ref, thrustDim/problemParams.maxThrustDim,'DisplayName','Throttle Profile');
-    % yline(1.0, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
-    % yline(problemParams.minThrustDim/problemParams.maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
-    % xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle'); subtitle('Limits only for show, not applied to trajectory')
-    % legend()
+    tgospanOpt = linspace(0,tTraj(end),997);
+    tspanOpt = tgo0 - tgospanOpt;
+    aTNormOpt = vecnorm(aTOptim,2,2);
+% Optim Throttle
+    figure('Name',"Optim Throttle"); hold on;
+    % Thrust magnitude = ||aT|| * m, dimensional thrust = a * m * A_ref * M_ref
+    thrustDim = aTNormOpt .* mOptim *(refVals.M_ref*refVals.A_ref);
+    plot(tspanOpt*refVals.T_ref, thrustDim/problemParams.maxThrustDim,'DisplayName','Throttle Profile');
+    yline(1.0, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
+    yline(problemParams.minThrustDim/problemParams.maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
+    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle'); subtitle('Limits only for show, not applied to trajectory');
+
+% Optim Range vs Altitude
+    rdOptimDim = rdOptim*L_ref;
+    rhatOpt = rdOptimDim ./ vecnorm(rdOptimDim,2,2);
+    centralOpt = acos(rhatOpt*U0);
+    arcLengthOpt = rMoon * centralOpt;
+    alt_opt = vecnorm(rdOptimDim,2,2) - rMoon;
+
+    figure('Name','Opt Radius'); hold on;
+    plot(arcLengthOpt/1000, alt_opt/1000);
+    %fprintf("Final X,Y: [%.3f, %.3f]\n",X(end,2),X(end,3))
+    xlabel('North km'); ylabel('Up km'); title('Range vs Altitude');
+    grid on; yline(0, 'Color', [1 0.2 0.2]);
+    ylim([0,50]);
+    subtitle(sprintf("East Error: %.2f m\n North Error: %.2f\n Up Error: %.2f", East(end), North(end), Up(end)));
 
 %% Sim Figures
 % Figure 1: 3D trajectory colored by thrust accel magnitude
