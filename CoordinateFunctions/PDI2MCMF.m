@@ -1,6 +1,6 @@
 function [r_mcmf, v_mcmf] = PDI2MCMF(altitude_km, lonInitDeg, latInitDeg, ...
                                       landingLonDeg, landingLatDeg, ...
-                                      inertialVel_mps, flightPathAngleDeg)
+                                      inertialVel_mps, flightPathAngleDeg, azimuth)
 
     lunarRadius_km = 1737.4; % km
     radMoon = lunarRadius_km * 1000; % m
@@ -13,7 +13,8 @@ function [r_mcmf, v_mcmf] = PDI2MCMF(altitude_km, lonInitDeg, latInitDeg, ...
 
     r_mcmf = (radMoon +h) * U1;
     if nargout > 1
-        az = getHeading(latPDI, lonPDI, latLand, lonLand);
+        %az = getHeading(latPDI, lonPDI, latLand, lonLand);
+        az = azimuth;
         u_h = sin(az)*E1 + cos(az)*N1;
         v_mcmf = inertialVel_mps * (cos(flightPathAngle)*u_h + sin(flightPathAngle)*U1);
     end
