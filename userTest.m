@@ -33,7 +33,7 @@ targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
 targetState.delta_t   = 5; % seconds dim, for btt
 
 optimParams = struct;
-optimParams.nodeCount = 997; %Count must be odd for Simpson
+optimParams.nodeCount = 997; %Count must be odd for Simpson, solutions might be sensitive to this value, which I do not like
 optimParams.glideSlopeFinalTheta = 45;
 optimParams.glideSlopeEnabled = true;
 optimParams.pointingEnabled = true; % not implemented yet
