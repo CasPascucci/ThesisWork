@@ -33,8 +33,8 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim] = optimizationL
     %[rfStar, vfStar, afStar, tgoVirt] = computeBeyondTerminationTargeting(r0, v0, paramsX0(1), paramsX0(2), rfStar, vfStar, afStar, delta_t, paramsX0(3), gConst);
     %paramsX0(3) = tgoVirt
 
-    obj = @(params) objectiveFunction(params, betaParam, afStar, rfStar, r0, vfStar, v0, gConst, nonDimParams, nodeCount);
-    nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, nodeCount, glideSlopeFlag, pointingFlag, problemParams, refVals);
+    obj = @(params) objectiveFunction(params, betaParam, afStar, rfStar, r0, vfStar, v0, gConst, nonDimParams, optimParams);
+    nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimParams, problemParams, refVals);
 
     [optParams, optCost] = fmincon(obj, paramsX0, Aineq, bineq, [], [], lb, ub, nonlincon, fminconOptions);
 
@@ -66,11 +66,11 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim] = optimizationL
     
 end
 %% Functions
-function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, v, gConst, nonDimParams, nodeCount)
+function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, v, gConst, nonDimParams, optimParams)
     gamma  = params(1);
     kr     = params(2);
     tgo   = params(3);
-    
+    nodeCount = optimParams.nodeCount;
 
     gamma1 = gamma;
     gamma2 = kr/(gamma+2) - 2;
@@ -90,9 +90,12 @@ function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, 
 
 end
 
-function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, nodeCount, glideSlopeFlag, pointingFlag, problemParams, refVals)
+function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimParams, problemParams, refVals)
+    nodeCount = optimParams.nodeCount;
+    glideSlopeFlag = optimParams.glideSlopeEnabled;
+    pointingFlag = optimParams.pointingEnabled;
     if pointingFlag || glideSlopeFlag
-        c = zeros(4*nodeCount,1)-1;
+        c = zeros(4*nodeCount,1)-1e-2;
     end
     gamma  = params(1);
     kr     = params(2);

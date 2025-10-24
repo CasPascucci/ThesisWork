@@ -2,10 +2,11 @@ clear all; close all; clc; format short
 %% Test function to see user experience for getParams() function calls
 % All values are dimensional
 PDIState = struct;
-PDIState.altitude_km        = 15.24;
+%PDIState.altitude_km        = 15.24;
+PDIState.altitude_km        = 13.36; % This altitude matches the email data, rather than table data, and matches the exact condition emailed within 1kg
 PDIState.lonInitDeg         = 41.85;
-PDIState.latInitDeg         = -71.6;
-PDIState.inertialVelocity   = 1698.3;
+PDIState.latInitDeg         = -71.59;
+PDIState.inertialVelocity   = 1693.8;
 PDIState.flightPathAngleDeg = 0;
 PDIState.azimuth            = pi;
 
@@ -34,13 +35,13 @@ targetState.delta_t   = 5; % seconds dim, for btt
 optimParams = struct;
 optimParams.nodeCount = 997; %Count must be odd for Simpson
 optimParams.glideSlopeFinalTheta = 45;
-optimParams.glideSlopeEnabled = false;
-optimParams.pointingEnabled = false;
+optimParams.glideSlopeEnabled = true;
+optimParams.pointingEnabled = true; % not implemented yet
 
+beta = 0.65;
+doPlotting = true; % disable this to not plot results
 
-
-
-[gammaOpt, krOpt, tgoOpt, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimParams, 1, true);
+[gammaOpt, krOpt, tgoOpt, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimParams, beta, doPlotting);
 % Print Values
 gammaOpt
 krOpt
