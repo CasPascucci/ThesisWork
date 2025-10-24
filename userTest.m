@@ -3,7 +3,7 @@ clear all; close all; clc; format short
 % All values are dimensional
 PDIState = struct;
 %PDIState.altitude_km        = 15.24;
-PDIState.altitude_km        = 13.36; % This altitude matches the email data, rather than table data, and matches the exact condition emailed within 1kg
+PDIState.altitude_km        = 13.36;
 PDIState.lonInitDeg         = 41.85;
 PDIState.latInitDeg         = -71.59;
 PDIState.inertialVelocity   = 1693.8;
@@ -33,7 +33,7 @@ targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
 targetState.delta_t   = 5; % seconds dim, for btt
 
 optimParams = struct;
-optimParams.nodeCount = 997; %Count must be odd for Simpson, solutions might be sensitive to this value, which I do not like
+optimParams.nodeCount = 997; %Count must be odd for Simpson
 optimParams.glideSlopeFinalTheta = 45;
 optimParams.glideSlopeEnabled = true;
 optimParams.pointingEnabled = true; % not implemented yet

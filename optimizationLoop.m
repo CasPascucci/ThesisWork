@@ -27,8 +27,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim] = optimizationL
         'Algorithm','interior-point','OptimalityTolerance', 1e-8, 'EnableFeasibilityMode',true, ...
         'ConstraintTolerance',0);
     nodeCount = optimParams.nodeCount;
-    glideSlopeFlag = optimParams.glideSlopeEnabled;
-    pointingFlag = optimParams.pointingEnabled;
+
 
     %[rfStar, vfStar, afStar, tgoVirt] = computeBeyondTerminationTargeting(r0, v0, paramsX0(1), paramsX0(2), rfStar, vfStar, afStar, delta_t, paramsX0(3), gConst);
     %paramsX0(3) = tgoVirt

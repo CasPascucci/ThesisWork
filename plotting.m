@@ -127,10 +127,6 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     %xline(tgo0Dim-3, 'r--','LineWidth',1); % Line 3 seconds before, when BTT kicks in ( if enabled and set to 3 seconds)
     legend('X', 'Y', 'Z', 'Magnitude','afStar','1g', '3g', 'Location', 'best');
     xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim) in MCMF frame');
-    if flag_thrustGotLimited
-        subtitle("Thrust is being Throttled");
-        fprintf("Thrust is being Throttled");
-    end
     grid on;
 
 %% Sim Figures
