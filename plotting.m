@@ -83,6 +83,8 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     grid on; yline(0, 'Color', [1 0.2 0.2]);
     ylim([0,50]);
     subtitle(sprintf("East Error: %.2f m\n North Error: %.2f\n Up Error: %.2f", East(end), North(end), Up(end)));
+    plot([0,0.250],[0,0.250],'k--');
+    
 
 % Optim Velocity Components 
     vdOptimDim = vdOptim * V_ref;
@@ -100,7 +102,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
 % Optim Acceleration Components Topo
     aTOptimDim = aTOptim * A_ref;
     aTOptimTOPO = MCMF2ENU(aTOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
-    figure('Name','Sim ENU Accel'); hold on;
+    figure('Name','Opt ENU Accel'); hold on;
     plot(tspanOpt*T_ref, aTOptimTOPO(1,:), 'LineWidth', 1.5);
     plot(tspanOpt*T_ref, aTOptimTOPO(2,:), 'LineWidth', 1.5);
     plot(tspanOpt*T_ref, aTOptimTOPO(3,:), 'LineWidth', 1.5);
@@ -114,7 +116,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
 
 % Optim Acceleration Components MCMF
     aTOptimDim = aTOptimDim';
-    figure('Name','Sim MCMF Accel'); hold on;
+    figure('Name','Opt MCMF Accel'); hold on;
     plot(tspanOpt*T_ref, aTOptimDim(1,:), 'LineWidth', 1.5);
     plot(tspanOpt*T_ref, aTOptimDim(2,:), 'LineWidth', 1.5);
     plot(tspanOpt*T_ref, aTOptimDim(3,:), 'LineWidth', 1.5);

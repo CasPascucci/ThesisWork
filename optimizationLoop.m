@@ -20,22 +20,24 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim] = optimizationL
     bineq = [-1e-6; -4-1e-4; -0.01];
 
     lb = [0, 0, 3];
-    ub = [5, 20, 11];
+    ub = [8, 30, 11];
 
-    fminconOptions = optimoptions('fmincon', 'Display', 'iter-detailed', 'MaxFunctionEvaluations', 5000, ...
-        'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-6, ...
+    fminconOptions = optimoptions('fmincon', 'Display', 'iter-detailed', 'MaxFunctionEvaluations', 10000, ...
+        'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-6,'MaxIterations', 1000, ...
         'Algorithm','interior-point','OptimalityTolerance', 1e-8, 'EnableFeasibilityMode',true, ...
         'ConstraintTolerance',0);
     nodeCount = optimParams.nodeCount;
+    glideSlopeFlag = optimParams.glideSlopeEnabled;
+    pointingFlag = optimParams.pointingEnabled;
 
     %[rfStar, vfStar, afStar, tgoVirt] = computeBeyondTerminationTargeting(r0, v0, paramsX0(1), paramsX0(2), rfStar, vfStar, afStar, delta_t, paramsX0(3), gConst);
     %paramsX0(3) = tgoVirt
 
     obj = @(params) objectiveFunction(params, betaParam, afStar, rfStar, r0, vfStar, v0, gConst, nonDimParams, nodeCount);
-    nonlincon = @(params) thrustLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, nodeCount);
+    nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, nodeCount, glideSlopeFlag, pointingFlag, problemParams, refVals);
 
     [optParams, optCost] = fmincon(obj, paramsX0, Aineq, bineq, [], [], lb, ub, nonlincon, fminconOptions);
-    % Temp Plotting
+
     gamma1 = optParams(1);
     gamma2 = optParams(2)/(optParams(1)+2) - 2;
 
@@ -88,7 +90,10 @@ function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, 
 
 end
 
-function [c, ceq] = thrustLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, nodeCount)
+function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, nodeCount, glideSlopeFlag, pointingFlag, problemParams, refVals)
+    if pointingFlag || glideSlopeFlag
+        c = zeros(4*nodeCount,1)-1;
+    end
     gamma  = params(1);
     kr     = params(2);
     tgo0   = params(3);
@@ -98,8 +103,8 @@ function [c, ceq] = thrustLimits(params, r0, v0, rfStar, vfStar, afStar, gConst,
     gamma2 = kr/(gamma+2) - 2;
 
 
-    [c1, c2] = calculateCoeffs(r0, v0, tgo0, gamma1, gamma2, afStar, rfStar, vfStar, gConst);
 
+    [c1, c2] = calculateCoeffs(r0, v0, tgo0, gamma1, gamma2, afStar, rfStar, vfStar, gConst);
     tgospan = linspace(0,tgo0,nodeCount);
 
     aT = afStar + c1*tgospan.^gamma1 + c2*tgospan.^gamma2;
@@ -109,25 +114,41 @@ function [c, ceq] = thrustLimits(params, r0, v0, rfStar, vfStar, afStar, gConst,
     Q = Q(end) - Q;
 
     m = m0 .* exp(-Q);
-    %m = flip(m);
-    
-    % Test delta_g for throttle limits
-    % gInit = -(rMoonND^2) * r0 / (norm(r0)^3);
-    % deltaG = abs(gInit-gConst);
-
-    % Test a more time-accruate deltaG, linearly accurate
-    % percentThroughFlight = tspan./tgo0;
-    % alt = norm(r0) - norm(rfStar);
-    % rFlight = rMoonND + alt*(1-percentThroughFlight);
-    % gFlight = (rMoonND^2) * rFlight ./ (rFlight.^3);
-    % deltaG = abs(gFlight - norm(gConst));
 
     thrust = m .*(aTmag);
 
     upper = thrust - (maxThrust);
     lower = minThrust - thrust;
-
-    c = [upper(:); lower(:)];
-    %max(c)
+    if pointingFlag || glideSlopeFlag
+        c(1:2*nodeCount) = [upper(:); lower(:)];
+    else
+        c = [upper(:); lower(:)];
+    end
     ceq = [];
+    if glideSlopeFlag
+        phi1hat = (tgospan.^(gamma1+2))./((gamma1+1)*(gamma1+2));
+        phi2hat = (tgospan.^(gamma2+2))./((gamma2+1)*(gamma2+2));
+        rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospan + 0.5*(gConst+afStar).*tgospan.^2;
+        rdOptimTOPO = MCMF2ENU(rdOptim,problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
+        rUnitVec = rdOptimTOPO./vecnorm(rdOptimTOPO,2,1);
+        if norm(rdOptimTOPO(:,1)) < 1e-10
+            rUnitVec(:,1) = [0;0;1];
+        end
+        vertUnitVec = [0;0;1];
+        
+        rMoon = problemParams.rMoon;
+        rdOptimDim = rdOptim*refVals.L_ref;
+        alt_opt = vecnorm(rdOptimDim,2,1) - rMoon;
+
+        altMask = find(alt_opt <= 500,1,'last');
+        altActive = alt_opt(1:altMask);
+        frac = (altActive - 250)/250;
+        frac(frac < 0) = 0;
+        theta = (frac*45) + 45;
+        cGlide = zeros(altMask,1);
+        for idx = 1:altMask
+            cGlide(idx) = cosd(theta(idx)) - dot(rUnitVec(:,idx),vertUnitVec);
+        end
+        c(2*nodeCount+1:2*nodeCount+altMask) = cGlide;
+    end
 end

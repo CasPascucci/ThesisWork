@@ -32,13 +32,15 @@ targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
 targetState.delta_t   = 5; % seconds dim, for btt
 
 optimParams = struct;
-optimParams.nodeCount = 997;
+optimParams.nodeCount = 997; %Count must be odd for Simpson
 optimParams.glideSlopeFinalTheta = 45;
+optimParams.glideSlopeEnabled = false;
+optimParams.pointingEnabled = false;
 
 
 
 
-[gammaOpt, krOpt, tgoOpt, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimParams, 0.65, true);
+[gammaOpt, krOpt, tgoOpt, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimParams, 1, true);
 % Print Values
 gammaOpt
 krOpt

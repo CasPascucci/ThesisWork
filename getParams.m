@@ -101,15 +101,15 @@ M_ref = 15103.0;
 %Convert PDI initial conditions into the MCMF frame of the problem
 [r0Dim, v0Dim] = PDI2MCMF(altitude_km, lonInitDeg, latInitDeg, ...
                                    landingLonDeg, landingLatDeg, ...
-                                   inertialVelocity, flightPathAngleDeg, azimuth);
+                                   inertialVelocity, flightPathAngleDeg, azimuth, rPlanet);
 
-r0Dim = [411608.123492225;
-         368665.998391003;
-         -1659817.39432084];
-
-v0Dim = [-1195.85903735503;
-         -1073.07538948840;
-         -536.193540835963];
+% r0Dim = [411608.123492225;
+%          368665.998391003;
+%          -1659817.39432084];
+% 
+% v0Dim = [-1195.85903735503;
+%          -1073.07538948840;
+%          -536.193540835963];
 
 rfDim = 10000*ENU2MCMF(rfLanding/10000,landingLatDeg,landingLonDeg,true);
 vfDim = ENU2MCMF(vfLanding,landingLatDeg,landingLonDeg,false);
