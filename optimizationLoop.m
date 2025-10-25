@@ -19,18 +19,18 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim] = optimizationL
               0  0 -1];     % tgo >= 0.01
     bineq = [-1e-6; -4-1e-4; -0.01];
 
-    lb = [0, 0, 3];
+    lb = [1e-6, 0, 3];
     ub = [8, 30, 11];
 
     if optimParams.pointingEnabled
         fminconOptions = optimoptions('fmincon', 'Display','final', 'MaxFunctionEvaluations', 10000, ...
             'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
-            'Algorithm','active-set','OptimalityTolerance', 1e-8, 'EnableFeasibilityMode',true, ...
+            'Algorithm','active-set', 'EnableFeasibilityMode',true, ...
             'HessianApproximation','lbfgs');
     else
         fminconOptions = optimoptions('fmincon', 'Display', 'final', 'MaxFunctionEvaluations', 10000, ...
             'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
-            'Algorithm','interior-point','OptimalityTolerance', 1e-8, 'EnableFeasibilityMode',true, ...
+            'Algorithm','interior-point', 'EnableFeasibilityMode',true, ...
             'HessianApproximation','lbfgs');
 
     end
@@ -61,7 +61,12 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim] = optimizationL
         [c, ~] = nonlincon(optParams);
         activeIneq = find(c >= 0); % Nearly active
         fprintf('\nActive inequality constraints: %d/%d\n', length(activeIneq), length(c));
+        [maxViolation, idx] = max(c);
+        fprintf('Max violation: %.3f at constraint %d\n', maxViolation, idx);
     end
+
+    
+
 
     gamma1 = optParams(1);
     gamma2 = optParams(2)/(optParams(1)+2) - 2;
