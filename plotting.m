@@ -67,7 +67,9 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     plot(tspanOpt*T_ref, thrustDim/problemParams.maxThrustDim,'DisplayName','Throttle Profile');
     yline(1.0, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
     yline(problemParams.minThrustDim/problemParams.maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
-    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle'); subtitle('Limits only for show, not applied to trajectory');
+    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle');
+    optFuelCost = (mOptim(end)-mOptim(1))*M_ref;
+    subtitle(sprintf("Consumed Fuel: %.2f kg", optFuelCost));
 
 % Optim Range vs Altitude
     rdOptimDim = rdOptim*L_ref;
@@ -111,7 +113,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     plot(tspanOpt(1)*T_ref,A_ref,'x','MarkerSize',10); % Plot 1g
     plot(tspanOpt(1)*T_ref,3*A_ref,'x','MarkerSize',10); % Plot 3g
     legend('East', 'North', 'Up', 'Magnitude','afStar','1g', '3g', 'Location', 'best');
-    xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim) in ENU frame');
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (Dim) in ENU frame');
     grid on;
 
 % Optim Acceleration Components MCMF
@@ -126,9 +128,9 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     plot(tspanOpt(1)*T_ref,3*A_ref,'x','MarkerSize',10); % Plot 3g
     %xline(tgo0Dim-3, 'r--','LineWidth',1); % Line 3 seconds before, when BTT kicks in ( if enabled and set to 3 seconds)
     legend('X', 'Y', 'Z', 'Magnitude','afStar','1g', '3g', 'Location', 'best');
-    xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim) in MCMF frame');
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (Dim) in MCMF frame');
     grid on;
-
+    
 %% Sim Figures
 % Figure 1: 3D trajectory colored by thrust accel magnitude
     figure('Name','3D Traj'); hold on;
@@ -173,7 +175,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     plot(tTraj(end)*T_ref,3*A_ref,'x','MarkerSize',10); % Plot 3g
     %xline(tgo0Dim-3, 'r--','LineWidth',1); % Line 3 seconds before, when BTT kicks in ( if enabled and set to 3 seconds)
     legend('East', 'North', 'Up', 'Magnitude','afStar','1g', '3g', 'Location', 'best');
-    xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim) in ENU frame');
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (Dim) in ENU frame');
     grid on;
 
 % Figure 4: Thrust acceleration components (dimensional) MCMF
@@ -187,7 +189,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     plot(tTraj(end)*T_ref,3*A_ref,'x','MarkerSize',10); % Plot 3g
     %xline(tgo0Dim-3, 'r--','LineWidth',1); % Line 3 seconds before, when BTT kicks in ( if enabled and set to 3 seconds)
     legend('X', 'Y', 'Z', 'Magnitude','afStar','1g', '3g', 'Location', 'best');
-    xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim) in MCMF frame');
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (Dim) in MCMF frame');
     if flag_thrustGotLimited
         subtitle("Thrust is being Throttled");
         fprintf("Thrust is being Throttled");
@@ -211,7 +213,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     plot(tTraj*T_ref, thrustDim/maxThrustDim,'DisplayName','Throttle Profile');
     yline(1.0, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
     yline(minThrustDim/maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
-    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle'); subtitle('Limits only for show, not applied to trajectory')
+    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle');
     legend()
 
 % Figure 7: Mass depletion over ND time

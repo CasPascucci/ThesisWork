@@ -1,4 +1,4 @@
-function [gammaOpt, krOpt, tgoOpt, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimParams, betaParam, doPlots)
+function [gammaOpt, krOpt, tgoOpt, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimParams, betaParam, doPlots, verboseOutput)
     addpath([pwd, '/CoordinateFunctions']);
 %% Main Function to Run for FP2PDG Optimization
 % Inputs: All given in dimensional values unless stated otherwise
@@ -175,7 +175,7 @@ nonDimParams.minThrustND = minThrustND;
 %% Optimization
 paramsX0 = [1, 6.5, 6];
 
-[optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimParams, refVals, delta_tND);
+[optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimParams, refVals, delta_tND, verboseOutput);
 gammaOpt = optParams(1);
 krOpt = optParams(2);
 tgoOpt = optParams(3) * T_ref;
