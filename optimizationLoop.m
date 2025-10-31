@@ -125,7 +125,7 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     glideSlopeFlag = optimParams.glideSlopeEnabled;
     pointingFlag = optimParams.pointingEnabled;
     if pointingFlag || glideSlopeFlag
-        c = zeros(4*nodeCount,1)-1e-2;
+        c = zeros(4*nodeCount,1)-100; % Preset constraint value to -100
     end
     gamma  = params(1);
     kr     = params(2);
@@ -199,6 +199,6 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
         %phiLimit = max(phiLimit,0.1); % Adds a 0.1 degree floor, useful for final nodes to touchdown when constraint is basically 0
 
         cPointing = phi - (phiLimit); % phi - phiLim <= 0
-        c(3*nodeCount+1:4*nodeCount) = cPointing;
+        c(3*nodeCount+4:4*nodeCount) = cPointing(4:end); % Currently not imposing in last few nodes before landing
     end
 end
