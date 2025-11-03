@@ -1,5 +1,8 @@
 % Plotting function
-function plotting(tTraj, stateTraj, optParams, aTOptim, aTList, refVals, problemParams, nonDimParams, flag_thrustGotLimited)
+function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, rdOptimUC)
+    if nargin < 14
+        rdOptimUC = [];
+    end
     
     gamma = optParams(1);
     kr = optParams(2);
@@ -51,26 +54,168 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, aTList, refVals, problem
     massInitDim = problemParams.massInitDim;
     massDryDim = problemParams.dryMassDim;
 %% Optim Figures
+    nodeCount = optimParams.nodeCount;
+    aTOptim = aTOptim';
+    rdOptim = rdOptim';
+    vdOptim = vdOptim';
+    mOptim = mOptim';
+    if ~isempty(rdOptimUC)
+        rdOptimUC = rdOptimUC';
+    end
 
-    % tspanOpt = linspace(0,tTraj(end),997);
-    % aTNormOpt = vecnorm(aTOptim,2,1);
-    % aTNormOpt = flip(aTNormOpt);
-    % 
-    % Q = cumtrapz(tspanOpt,aTNormOpt./isp);
-    % Q = Q(end) - Q;
-    % 
-    % mOpt = 1 .* exp(-Q);
-    % mOpt = flip(mOpt);
-    % 
-    % figure('Name','Opt Throttle'); hold on;
-    % % Thrust magnitude = ||aT|| * m, dimensional thrust = a * m * A_ref * M_ref
-    % thrustDim = aTNormOpt .* mOpt *(refVals.M_ref*refVals.A_ref);
-    % plot(tspanOpt*T_ref, thrustDim/problemParams.maxThrustDim,'DisplayName','Throttle Profile');
-    % yline(1.0, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
-    % yline(problemParams.minThrustDim/problemParams.maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
-    % xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle'); subtitle('Limits only for show, not applied to trajectory')
-    % legend()
+    rdOptimTOPO = MCMF2ENU(rdOptim',problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
+    rdOptimTOPODim = rdOptimTOPO*L_ref;
 
+    tgospanOpt = linspace(0,tTraj(end),nodeCount);
+    tspanOpt = tgo0 - tgospanOpt;
+    aTNormOpt = vecnorm(aTOptim,2,2);
+% Optim Throttle
+    figure('Name',"Optim Throttle"); hold on;
+    % Thrust magnitude = ||aT|| * m, dimensional thrust = a * m * A_ref * M_ref
+    thrustDim = aTNormOpt .* mOptim *(refVals.M_ref*refVals.A_ref);
+    plot(tspanOpt*T_ref, thrustDim/problemParams.maxThrustDim,'DisplayName','Throttle Profile');
+    yline(1.0, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
+    yline(problemParams.minThrustDim/problemParams.maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
+    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle');
+    optFuelCost = (mOptim(end)-mOptim(1))*M_ref;
+    subtitle(sprintf("Consumed Fuel: %.2f kg", optFuelCost));
+
+% Optim Range vs Altitude
+    rdOptimDim = rdOptim*L_ref;
+    rhatOpt = rdOptimDim ./ vecnorm(rdOptimDim,2,2);
+    centralOpt = acos(rhatOpt*U0);
+    arcLengthOpt = rMoon * centralOpt;
+    alt_opt = vecnorm(rdOptimDim,2,2) - rMoon;
+
+    figure('Name','Opt Range vs Altitude'); hold on;
+
+    if ~isempty(rdOptimUC)
+        rdOptimUCDim = rdOptimUC * L_ref;
+        rhatOptUC = rdOptimUCDim ./ vecnorm(rdOptimUCDim,2,2);
+        centralOptUC = acos(rhatOptUC*U0);
+        arcLengthOptUC = rMoon * centralOptUC;
+        alt_optUC = vecnorm(rdOptimUCDim,2,2) - rMoon;
+        plot(arcLengthOptUC/1000, alt_optUC/1000, 'r-', 'DisplayName',"Unconstrained Trajectory");
+    end
+
+    plot(arcLengthOpt/1000, alt_opt/1000, 'b-', 'DisplayName',"Constrained Trajectory");
+    %fprintf("Final X,Y: [%.3f, %.3f]\n",X(end,2),X(end,3))
+    xlabel('North km'); ylabel('Up km'); title('Range vs Altitude');
+    grid on; yline(0, 'Color', [1 0.2 0.2]);
+    altMax = 1.5 * max(max(alt_opt),max(alt_optUC)) / 1000;
+    ylim([0,altMax]);
+    subtitle(sprintf("East Error: %.2f m\n North Error: %.2f\n Up Error: %.2f", East(end), North(end), Up(end)));
+    legend();
+
+% Optim 3D Plot
+    Ntotal = size(rdOptimTOPODim, 2);% total node count
+    idx_hi = floor(0.20 * Ntotal); % match the high index from constraints
+    idx_lo = floor(0.01 * Ntotal) + 1; % match the low index from constraints
+    idx = idx_lo:idx_hi; % range
+    
+    EOpt = rdOptimTOPODim(1, idx);
+    NOpt = rdOptimTOPODim(2, idx);
+    UOpt = rdOptimTOPODim(3, idx);
+    
+    ETraj = rdOptimTOPODim(1, 1:idx_hi);
+    NTraj = rdOptimTOPODim(2, 1:idx_hi);
+    UTraj = rdOptimTOPODim(3, 1:idx_hi);
+    
+    theta_fun = @(u) min(89.9, 45 + 45 * max(0, min(1, (u - 250) ./ 250))); % enforces theta piecewise nature
+    Umin = min(UOpt); % lowest height value in the idx range
+    Umax = min(500, max(UOpt, [], 'omitnan')); % highest height value in idx, capped at 500
+    U_samp = linspace(Umin, Umax, 120);
+    theta_deg = theta_fun(U_samp);
+    
+    cosBound = cosd(theta_deg);
+    cosBound = max(cosBound, 1e-3);
+    R_samp = U_samp .* sqrt(1 - cosBound.^2) ./ cosBound; % R=U*tan(theta), and then sin = sqrt(1-cos^2)
+    Rcap = 3000;
+    R_samp = min(R_samp, Rcap);
+    
+    azimuth = linspace(0, 2*pi, 120);
+    [azGrid, altGrid] = meshgrid(azimuth, U_samp);
+    [~, rGrid] = meshgrid(azimuth, R_samp);
+    eastGrid  = rGrid .* cos(azGrid);
+    northGrid = rGrid .* sin(azGrid);
+    
+    % Plateau ring at top
+    UPlat = Umax;
+    RPlat = Rcap;
+    azPlat = linspace(0, 2*pi, 361);
+    eastPlat = RPlat * cos(azPlat);
+    northPlat = RPlat * sin(azPlat);
+    UPlat = UPlat * ones(size(azPlat));
+    
+    figure('Name','Opt 3D'); hold on; grid on; axis equal;
+    plot3(ETraj/1000, NTraj/1000, UTraj/1000, 'b-', 'LineWidth', 2, 'DisplayName',"Constrained Trajectory");
+    surf(eastGrid/1000, northGrid/1000, altGrid/1000, ...
+         'FaceAlpha', 0.15, 'EdgeColor', 'none','DisplayName',"");
+    plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 1.5,'DisplayName',"");
+    if ~isempty(rdOptimUC)
+        rdOptimUC_TOPO = MCMF2ENU(rdOptimUC',problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
+        rdOptimUC_TOPO_DIM = rdOptimUC_TOPO * L_ref;
+        ETrajUC = rdOptimUC_TOPO_DIM(1, 1:idx_hi);
+        NTrajUC = rdOptimUC_TOPO_DIM(2, 1:idx_hi);
+        UTrajUC = rdOptimUC_TOPO_DIM(3, 1:idx_hi);
+        plot3(ETrajUC/1000, NTrajUC/1000, UTrajUC/1000, 'r-', 'LineWidth', 1, 'DisplayName',"Unconstrained Trajectory");
+    
+    xlabel('East (km)');
+    ylabel('North (km)');
+    zlabel('Up (km)');
+    title('3D Trajectory with Cosine-Based Glide-Slope Envelope (2%–20% nodes)');
+    view(35,20); camproj orthographic;
+    zlim([0,2]);
+    xlim([-3,3]);
+    ylim([-3,3]);
+    axis square;
+    legend;
+
+
+
+% Optim Velocity Components 
+    vdOptimDim = vdOptim * V_ref;
+    vdOptimTOPO = MCMF2ENU(vdOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
+    figure('Name','Opt Vel TOPO'); hold on;
+    plot(tspanOpt*T_ref, vdOptimTOPO(1,:), 'LineWidth', 1.5);
+    plot(tspanOpt*T_ref, vdOptimTOPO(2,:), 'LineWidth', 1.5);
+    plot(tspanOpt*T_ref, vdOptimTOPO(3,:), 'LineWidth', 1.5);
+    plot(tspanOpt*T_ref, vecnorm(vdOptimTOPO, 2, 1), '-', 'LineWidth', 2);
+    legend('East', 'North', 'Up', 'Magnitude', 'Location', 'best');
+    xlabel('Time s'); ylabel('Velocity m/s'); title('Velocity Profile (Dim)');
+    grid on;
+    xlim([0, ceil(max(tspanOpt*T_ref)/100)*100]);
+
+% Optim Acceleration Components Topo
+    aTOptimDim = aTOptim * A_ref;
+    aTOptimTOPO = MCMF2ENU(aTOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
+    figure('Name','Opt ENU Accel'); hold on;
+    plot(tspanOpt*T_ref, aTOptimTOPO(1,:), 'LineWidth', 1.5);
+    plot(tspanOpt*T_ref, aTOptimTOPO(2,:), 'LineWidth', 1.5);
+    plot(tspanOpt*T_ref, aTOptimTOPO(3,:), 'LineWidth', 1.5);
+    plot(tspanOpt*T_ref, vecnorm(aTOptimTOPO,2,1), '-', 'LineWidth', 2);
+    plot(tspanOpt(1)*T_ref,norm(nonDimParams.afStarND)*A_ref,'.','MarkerSize',10); % Plot afStar
+    plot(tspanOpt(1)*T_ref,A_ref,'x','MarkerSize',10); % Plot 1g
+    plot(tspanOpt(1)*T_ref,3*A_ref,'x','MarkerSize',10); % Plot 3g
+    legend('East', 'North', 'Up', 'Magnitude','afStar','1g', '3g', 'Location', 'best');
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (Dim) in ENU frame');
+    grid on;
+
+% Optim Acceleration Components MCMF
+    aTOptimDim = aTOptimDim';
+    figure('Name','Opt MCMF Accel'); hold on;
+    plot(tspanOpt*T_ref, aTOptimDim(1,:), 'LineWidth', 1.5);
+    plot(tspanOpt*T_ref, aTOptimDim(2,:), 'LineWidth', 1.5);
+    plot(tspanOpt*T_ref, aTOptimDim(3,:), 'LineWidth', 1.5);
+    plot(tspanOpt*T_ref, vecnorm(aTOptimDim,2,1), '-', 'LineWidth', 2);
+    plot(tspanOpt(1)*T_ref,norm(nonDimParams.afStarND)*A_ref,'.','MarkerSize',10); % Plot afStar
+    plot(tspanOpt(1)*T_ref,A_ref,'x','MarkerSize',10); % Plot 1g
+    plot(tspanOpt(1)*T_ref,3*A_ref,'x','MarkerSize',10); % Plot 3g
+    %xline(tgo0Dim-3, 'r--','LineWidth',1); % Line 3 seconds before, when BTT kicks in ( if enabled and set to 3 seconds)
+    legend('X', 'Y', 'Z', 'Magnitude','afStar','1g', '3g', 'Location', 'best');
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (Dim) in MCMF frame');
+    grid on;
+    
 %% Sim Figures
 % Figure 1: 3D trajectory colored by thrust accel magnitude
     figure('Name','3D Traj'); hold on;
@@ -96,7 +241,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, aTList, refVals, problem
     central = acos(rhat*U0);
     arcLength = rMoon * central;
 
-    figure('Name','Sim Radius'); hold on;
+    figure('Name','Sim Range vs Altitude'); hold on;
     plot(arcLength/1000, alt_m/1000);
     %fprintf("Final X,Y: [%.3f, %.3f]\n",X(end,2),X(end,3))
     xlabel('North km'); ylabel('Up km'); title('Range vs Altitude');
@@ -115,7 +260,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, aTList, refVals, problem
     plot(tTraj(end)*T_ref,3*A_ref,'x','MarkerSize',10); % Plot 3g
     %xline(tgo0Dim-3, 'r--','LineWidth',1); % Line 3 seconds before, when BTT kicks in ( if enabled and set to 3 seconds)
     legend('East', 'North', 'Up', 'Magnitude','afStar','1g', '3g', 'Location', 'best');
-    xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim) in ENU frame');
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (Dim) in ENU frame');
     grid on;
 
 % Figure 4: Thrust acceleration components (dimensional) MCMF
@@ -129,7 +274,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, aTList, refVals, problem
     plot(tTraj(end)*T_ref,3*A_ref,'x','MarkerSize',10); % Plot 3g
     %xline(tgo0Dim-3, 'r--','LineWidth',1); % Line 3 seconds before, when BTT kicks in ( if enabled and set to 3 seconds)
     legend('X', 'Y', 'Z', 'Magnitude','afStar','1g', '3g', 'Location', 'best');
-    xlabel('Time s'); ylabel('Accel m/s^2'); title('Thrust Accel Profile (Dim) in MCMF frame');
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (Dim) in MCMF frame');
     if flag_thrustGotLimited
         subtitle("Thrust is being Throttled");
         fprintf("Thrust is being Throttled");
@@ -153,7 +298,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, aTList, refVals, problem
     plot(tTraj*T_ref, thrustDim/maxThrustDim,'DisplayName','Throttle Profile');
     yline(1.0, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
     yline(minThrustDim/maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
-    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle'); subtitle('Limits only for show, not applied to trajectory')
+    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle');
     legend()
 
 % Figure 7: Mass depletion over ND time

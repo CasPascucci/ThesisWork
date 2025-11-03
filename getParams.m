@@ -1,4 +1,4 @@
-function [gammaOpt, krOpt, tgoOpt, fuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, betaParam, doPlots)
+function [gammaOpt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion)
     addpath([pwd, '/CoordinateFunctions']);
 %% Main Function to Run for FP2PDG Optimization
 % Inputs: All given in dimensional values unless stated otherwise
@@ -9,6 +9,13 @@ function [gammaOpt, krOpt, tgoOpt, fuelCost, aTList] = getParams(PDIState, plane
 %       .inertialVelocity: Inertial frame velocity at PDI, m/s
 %       .flightPathAngleDeg: The angle between the flight path, and the
 %                            horizontal plane, deg
+%       .azimuth: Heading angle, measured clockwise from North, rad
+%
+%   planetaryParams:
+%       .rPlanet: radius of the planet, m
+%       .gPlanet: average surface gravity of the planet, m/s
+%       .gEarth: value used for Earth gravity, used in
+%                nondimensionalization of isp
 %
 %   targetState:
 %       .landingLonDeg: Longitude of Landing
@@ -25,9 +32,18 @@ function [gammaOpt, krOpt, tgoOpt, fuelCost, aTList] = getParams(PDIState, plane
 %       .maxThrust: maximum total thrust of the lander, Newtons
 %       .minThrust: minimum total thrust of the lander, Newtons
 %
-%   planetaryParams:
-%       .rPlanet: radius of the planet, m
-%       .gPlanet: average surface gravity of the planet, m/s
+%   targetState:
+%       .landingLonDeg: Longitude of Landing Site, degrees
+%       .landingLatDeg: Latitude of Landing Site, degrees
+%       .rfLanding: Topocentric coordinates of landing site, frame centered
+%                   at the landing lat & lon at planetary radius, meters
+%       .vfLanding: Topocentric frame desired final velocity, m/s
+%       .afLanding: Topocentric frame desired final acceleration, m/s^2
+%       .delta_t: Delta T value used for Beyond Termination Targeting,
+%                 DISABLED, seconds
+%
+%   optimParams:
+%       .nodeCount: number of nodes to use in optimization
 %
 %   beta: weight value between 0 and 1, weighing the objective function
 %         towards smoothing the acceleration curve, or minimzing fuel cost
@@ -37,10 +53,13 @@ function [gammaOpt, krOpt, tgoOpt, fuelCost, aTList] = getParams(PDIState, plane
 %   gammaOpt, krOpt, tgoOpt: optimal parameters for FP2PDG from the given
 %                            conditions
 %   fuelCost: Estimated fuel cost from simulation of flight
-if nargin < 5
-    betaParam = 0.75;
-elseif nargin < 6
+if nargin < 6
+    betaParam = 0.65;
+elseif nargin < 7
     doPlots = false;
+end
+if nargin < 9
+    dispersion = false;
 end
     
 
@@ -85,15 +104,15 @@ M_ref = 15103.0;
 %Convert PDI initial conditions into the MCMF frame of the problem
 [r0Dim, v0Dim] = PDI2MCMF(altitude_km, lonInitDeg, latInitDeg, ...
                                    landingLonDeg, landingLatDeg, ...
-                                   inertialVelocity, flightPathAngleDeg, azimuth);
+                                   inertialVelocity, flightPathAngleDeg, azimuth, rPlanet);
 
-r0Dim = [411608.123492225;
-         368665.998391003;
-         -1659817.39432084];
-
-v0Dim = [-1195.85903735503;
-         -1073.07538948840;
-         -536.193540835963];
+% r0Dim = [411608.123492225;
+%          368665.998391003;
+%          -1659817.39432084];
+% 
+% v0Dim = [-1195.85903735503;
+%          -1073.07538948840;
+%          -536.193540835963];
 
 rfDim = 10000*ENU2MCMF(rfLanding/10000,landingLatDeg,landingLonDeg,true);
 vfDim = ENU2MCMF(vfLanding,landingLatDeg,landingLonDeg,false);
@@ -159,16 +178,27 @@ nonDimParams.minThrustND = minThrustND;
 %% Optimization
 paramsX0 = [1, 6.5, 6];
 
-[optParams, optCost, aTOptim, mOptim] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, refVals, delta_tND);
+[optParams, ~, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
 gammaOpt = optParams(1);
 krOpt = optParams(2);
 tgoOpt = optParams(3) * T_ref;
+optFuelCost = (mOptim(end)-mOptim(1))*M_ref;
 
-    if nargout >3 || doPlots
+% Run Unconstrained Opt for Plotting
+if ~dispersion
+    fprintf("-----------------------------------------------");
+    fprintf("Unconstrained OPT for Plotting");
+    optimizationParamsUC = optimizationParams;
+    optimizationParamsUC.glideSlopeEnabled = false;
+    [optParamsUC, ~, aTOptimUC, mOptimUC, rdOptimUC, vdOptimUC] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParamsUC, refVals, delta_tND, false);
+    fprintf("-----------------------------------------------");
+end
+% Plotting Handling
+    if nargout > 5 || doPlots
         [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gammaOpt, krOpt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
-        fuelCost = M_ref*(stateTraj(1,7) - stateTraj(end,7));
+        simFuelCost = M_ref*(stateTraj(1,7) - stateTraj(end,7));
         if doPlots
-            plotting(tTraj, stateTraj, optParams, aTOptim, aTList, refVals, problemParams, nonDimParams, flag_thrustGotLimited);
+            plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, rdOptimUC);
         end
     end
 end

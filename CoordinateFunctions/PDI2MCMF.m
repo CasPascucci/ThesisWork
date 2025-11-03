@@ -1,9 +1,7 @@
 function [r_mcmf, v_mcmf] = PDI2MCMF(altitude_km, lonInitDeg, latInitDeg, ...
                                       landingLonDeg, landingLatDeg, ...
-                                      inertialVel_mps, flightPathAngleDeg, azimuth)
+                                      inertialVel_mps, flightPathAngleDeg, azimuth, radMoon)
 
-    lunarRadius_km = 1737.4; % km
-    radMoon = lunarRadius_km * 1000; % m
     h  = altitude_km  * 1000; % m
     latPDI = deg2rad(latInitDeg);  lonPDI = deg2rad(lonInitDeg);
     latLand = deg2rad(landingLatDeg); lonLand = deg2rad(landingLonDeg);

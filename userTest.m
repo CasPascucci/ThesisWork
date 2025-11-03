@@ -2,10 +2,10 @@ clear all; close all; clc; format short
 %% Test function to see user experience for getParams() function calls
 % All values are dimensional
 PDIState = struct;
-PDIState.altitude_km        = 15.24;
+PDIState.altitude_km        = 13.36;
 PDIState.lonInitDeg         = 41.85;
-PDIState.latInitDeg         = -71.6;
-PDIState.inertialVelocity   = 1698.3;
+PDIState.latInitDeg         = -71.59;
+PDIState.inertialVelocity   = 1693.8;
 PDIState.flightPathAngleDeg = 0;
 PDIState.azimuth            = pi;
 
@@ -27,15 +27,27 @@ targetState.landingLatDeg      = -90.0;
 targetState.rfLanding = [0;0;0];
 targetState.vfLanding = [0;0;-1];
 targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
-%targetState.afLanding = [0;0;vehicleParams.maxThrust/(6710)];
+%targetState.afLanding = [0;0;vehicleParams.maxThrust/(6710)]; % This
+                                                               %afStar seems to be too high for a solvable path
 targetState.delta_t   = 5; % seconds dim, for btt
 
+optimizationParams = struct;
+optimizationParams.nodeCount = 997; %Count must be odd for Simpson
+optimizationParams.glideSlopeFinalTheta = 45; %deg
+optimizationParams.glideSlopeEnabled = true;
+optimizationParams.pointingEnabled = false;
+optimizationParams.maxTiltAccel = 2; % deg/s^2
+optimizationParams.maxTiltRate = 5; %deg/s
 
+beta = 0.65;
+doPlotting = true; % disable this to not plot results
+verboseOutput = true;
 
-
-[gammaOpt, krOpt, tgoOpt, fuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, 1, true);
+[gammaOpt, krOpt, tgoOpt,~,~, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput);
+% tgoOpt returned in seconds
 % Print Values
 gammaOpt
 krOpt
 tgoOpt
-fuelCost
+optFuelCost
+simFuelCost
