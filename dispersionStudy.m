@@ -127,7 +127,7 @@ if ~exist('Dispersion','dir')
 end
 
 timeRun = datestr(now,'yyyymmdd_HHMMSS');
-runDir = fullfile('Dispersion', timeRun);
+runDir = fullfile('DispersionOnlyThrust', timeRun);
 mkdir(runDir);
 matfile = fullfile(runDir, ['results_dispersion_' timeRun '.mat']);
 csvfile = fullfile(runDir, ['results_dispersion_' timeRun '.csv']);
@@ -138,3 +138,6 @@ T = table( (1:numel(Results)).', [Results.exit_ok].',[Results.gamma].', [Results
            [Results.coeff1].', [Results.coeff2].', [Results.coeff3].', [Results.coeff4].', ...
            'VariableNames', {'k','exit_ok','gamma','kr','tgo','fuel_opt','coeff1','coeff2','coeff3','coeff4'} );
 writetable(T, csvfile);
+
+
+statsPlotting(Results);
