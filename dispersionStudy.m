@@ -127,7 +127,7 @@ if ~exist('Dispersion','dir')
 end
 
 timeRun = datestr(now,'yyyymmdd_HHMMSS');
-runDir = fullfile('DispersionOnlyThrust', timeRun);
+runDir = fullfile('Dispersion', timeRun);
 mkdir(runDir);
 matfile = fullfile(runDir, ['results_dispersion_' timeRun '.mat']);
 csvfile = fullfile(runDir, ['results_dispersion_' timeRun '.csv']);

@@ -110,7 +110,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
 % Optim 3D Plot
     Ntotal = size(rdOptimTOPODim, 2);% total node count
     idx_hi = floor(0.20 * Ntotal); % match the high index from constraints
-    idx_lo = floor(0.01 * Ntotal) + 1; % match the low index from constraints
+    idx_lo = floor(0.02 * Ntotal) + 1; % match the low index from constraints
     idx = idx_lo:idx_hi; % range
     
     EOpt = rdOptimTOPODim(1, idx);
