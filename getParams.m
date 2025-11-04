@@ -184,13 +184,20 @@ krOpt = optParams(2);
 tgoOpt = optParams(3) * T_ref;
 optFuelCost = (mOptim(end)-mOptim(1))*M_ref;
 
-% Run Unconstrained Opt for Plotting
+% Run Unconstrained Opt and Sim for Plotting
 if ~dispersion
     fprintf("-----------------------------------------------");
     fprintf("Unconstrained OPT for Plotting");
     optimizationParamsUC = optimizationParams;
     optimizationParamsUC.glideSlopeEnabled = false;
     [optParamsUC, ~, aTOptimUC, mOptimUC, rdOptimUC, vdOptimUC] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParamsUC, refVals, delta_tND, false);
+    ucOptFuelCost = (mOptimUC(end)-mOptimUC(1))*M_ref;
+    gammaOptUC = optParamsUC(1);
+    krOptUC = optParamsUC(2);
+    tgoOptUC = optParamsUC(3) * T_ref;
+    [tTrajUC, stateTrajUC, aTListUC, flag_thrustGotLimitedUC] = closedLoopSim(gammaOptUC, krOptUC, tgoOptUC/T_ref, problemParams, nonDimParams, refVals, delta_tND);
+    ucSimFuelCost = M_ref*(stateTrajUC(1,7) - stateTrajUC(end,7));
+    unconstrained = struct('tTraj',tTrajUC,'stateTraj',stateTrajUC,'optParams',optParamsUC,'aTOptim',aTOptimUC,'mOptim',mOptimUC,'rdOptim',rdOptimUC,'vdOptim',vdOptimUC,'aTList',aTListUC,'flag_thrustGotLimited',flag_thrustGotLimitedUC);
     fprintf("-----------------------------------------------");
 end
 % Plotting Handling
@@ -198,7 +205,7 @@ end
         [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gammaOpt, krOpt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
         simFuelCost = M_ref*(stateTraj(1,7) - stateTraj(end,7));
         if doPlots
-            plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, rdOptimUC);
+            plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained);
         end
     end
 end

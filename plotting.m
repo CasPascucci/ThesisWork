@@ -1,9 +1,5 @@
 % Plotting function
-function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, rdOptimUC)
-    if nargin < 14
-        rdOptimUC = [];
-    end
-    
+function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, unconstrained)
     gamma = optParams(1);
     kr = optParams(2);
     tgo0 = optParams(3);
@@ -48,6 +44,35 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     aU = aTDimENU(3,:)';
     aT_ENU = [aE, aN, aU];
     aT_norm_ENU = vecnorm(aT_ENU,2,2);
+    
+    
+    hasUC = exist('unconstrained','var') && ~isempty(unconstrained);
+    if hasUC
+        tTrajUC = unconstrained.tTraj;
+        rStateUC = unconstrained.stateTraj(:,1:3);
+        vStateUC = unconstrained.stateTraj(:,4:6);
+        mStateUC = unconstrained.stateTraj(:,7);
+        rDimUC = rStateUC * L_ref;
+        vDimUC = vStateUC * V_ref;
+        mDimUC = mStateUC * M_ref;
+        deltaR_UC   = MCMF2ENU(rDimUC', problemParams.landingLatDeg, problemParams.landingLonDeg, true,  true);
+        vDimENU_UC  = MCMF2ENU(vDimUC', problemParams.landingLatDeg, problemParams.landingLonDeg, false, true);
+        EastUC = deltaR_UC(1,:)';
+        NorthUC = deltaR_UC(2,:)';
+        UpUC = deltaR_UC(3,:)';
+
+        alt_m_UC = vecnorm(rDimUC,2,2) - rMoon;
+        aTDimUC = unconstrained.aTList * A_ref;
+        aTDimENU_UC = MCMF2ENU(aTDimUC, problemParams.landingLatDeg, problemParams.landingLonDeg, false, true);
+        aE_UC = aTDimENU_UC(1,:)';
+        aN_UC = aTDimENU_UC(2,:)';
+        aU_UC = aTDimENU_UC(3,:)';
+        aT_norm_ENU_UC = vecnorm([aE_UC, aN_UC, aU_UC], 2, 2);
+
+        aTDimNormUC = vecnorm(aTDimUC,2,1)';
+    end
+
+
 
     maxThrustDim = problemParams.maxThrustDim;
     minThrustDim = problemParams.minThrustDim;
@@ -59,9 +84,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     rdOptim = rdOptim';
     vdOptim = vdOptim';
     mOptim = mOptim';
-    if ~isempty(rdOptimUC)
-        rdOptimUC = rdOptimUC';
-    end
+    rdOptimUC = unconstrained.rdOptim';
 
     rdOptimTOPO = MCMF2ENU(rdOptim',problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
     rdOptimTOPODim = rdOptimTOPO*L_ref;
@@ -159,7 +182,7 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
         NTrajUC = rdOptimUC_TOPO_DIM(2, 1:idx_hi);
         UTrajUC = rdOptimUC_TOPO_DIM(3, 1:idx_hi);
         plot3(ETrajUC/1000, NTrajUC/1000, UTrajUC/1000, 'r-', 'LineWidth', 1, 'DisplayName',"Unconstrained Trajectory");
-    
+    end
     xlabel('East (km)');
     ylabel('North (km)');
     zlabel('Up (km)');
@@ -217,37 +240,96 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
     grid on;
     
 %% Sim Figures
-% Figure 1: 3D trajectory colored by thrust accel magnitude
-    figure('Name','3D Traj'); hold on;
-    scatter3(East/1000, North/1000, Up/1000, 20, aT_norm_ENU, 'filled');
-    xlabel('East (km)');
-    ylabel('North (km)');
-    zlabel('Up (km)');
-    title('3D Trajectory with Thrust Accel Magnitude');
-    grid on; view(90, 0);
-    subtitle(sprintf('gamma = %.4f\n kr = %.4f\n tgo = %.4f (s)',gamma, kr, tgo0*T_ref));
-    colorbar; colormap(parula);
-    axis equal;
-    thetaCircle = linspace(0,2*pi,1000);
-    x = (rMoon * cos(thetaCircle))/1000;
-    y = (rMoon * sin(thetaCircle) - rMoon)/1000;
-    plot3(zeros(1000),x,y,'w-');
-    xlim([min(East)/1000, max(East)/1000]);
-    ylim([min(North)/1000, max(North)/1000]);
-    zlim([min(Up)/1000, max(Up)/1000]);
+% Figure 1: 3D trajectory with glideslope Cone
+    idx2km = find(alt_m <= 2000, 1, 'first');
+    if isempty(idx2km)
+        % Fallback: if never reaches 2 km, just use the last 20%
+        NtotalSim = numel(alt_m);
+        idx2km = max(1, NtotalSim - floor(0.20*NtotalSim) + 1);
+    end
+    idx_sim = idx2km:numel(alt_m);
+
+    ETrajSim = East(idx_sim);
+    NTrajSim = North(idx_sim);
+    UTrajSim = Up(idx_sim);
+
+    if hasUC
+        idx2kmUC = find(alt_m_UC <= 2000, 1, 'first');
+        if isempty(idx2kmUC)
+            NtotalSimUC = numel(alt_m_UC);
+            idx2kmUC = max(1, NtotalSimUC - floor(0.20*NtotalSimUC) + 1);
+        end
+        idx_simUC = idx2kmUC:numel(alt_m_UC);
+
+        ETrajSimUC = EastUC(idx_simUC);
+        NTrajSimUC = NorthUC(idx_simUC);
+        UTrajSimUC = UpUC(idx_simUC);
+    end
+
+    theta_fun = @(u) min(89.9, 45 + 45*max(0, min(1, (u-250)./250)));
+    UminEnv = min(UTrajSim);                       % use sim heights
+    UmaxEnv = min(500, max(UTrajSim,[],'omitnan'));
+    U_samp  = linspace(UminEnv, UmaxEnv, 1000);
+    theta_deg = theta_fun(U_samp);
+    cosBound  = max(cosd(theta_deg), 1e-3);
+    R_samp    = U_samp .* sqrt(1 - cosBound.^2) ./ cosBound;
+    Rcap      = 3000;
+    R_samp    = min(R_samp, Rcap);
+    azimuth         = linspace(0, 2*pi, 360);
+    [azGrid, altGrid] = meshgrid(azimuth, U_samp);
+    [~, rGrid]        = meshgrid(azimuth, R_samp);
+    eastGrid  = rGrid .* cos(azGrid);
+    northGrid = rGrid .* sin(azGrid);
+
+    % Plateau ring at top
+    UPlat = UmaxEnv; RPlat = Rcap;
+    azPlat = linspace(0, 2*pi, 361);
+    eastPlat  = RPlat * cos(azPlat);
+    northPlat = RPlat * sin(azPlat);
+    UPlat     = UPlat * ones(size(azPlat));
+
+    figure('Name','Sim 3D (Constrained vs Unconstrained)'); hold on; grid on; axis equal;
+    surf(eastGrid/1000, northGrid/1000, altGrid/1000, 'FaceAlpha', 0.15, 'EdgeColor', 'none','DisplayName','Glideslope Cone');
+    plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 1.5, 'DisplayName','500m Limit');
+    plot3(ETrajSim/1000, NTrajSim/1000, UTrajSim/1000, 'b-', 'LineWidth', 2, 'DisplayName','Constrained (Sim)');
+    if hasUC
+        plot3(ETrajSimUC/1000, NTrajSimUC/1000, UTrajSimUC/1000, 'r-', 'LineWidth', 1.5, 'DisplayName','Unconstrained (Sim)');
+    end
+
+    xlabel('East (km)'); ylabel('North (km)'); zlabel('Up (km)');
+    title('3D Trajectory (Sim) with Cosine-Based Glide-Slope Envelope, Final 2 KM');
+    view(35,20); camproj orthographic;
+    zlim([0, 2]); xlim([-3,3]); ylim([-3,3]); axis square;
+    legend('Location','best');
 
 % Figure 2: Range vs Altitude
-    rhat = rDim ./ vecnorm(rDim,2,2);
-    central = acos(rhat*U0);
-    arcLength = rMoon * central;
-
+    rhat      = rDim ./ vecnorm(rDim,2,2);
+    central   = acos(rhat*U0);
+    arcLength = rMoon * central;   % meters
+    
     figure('Name','Sim Range vs Altitude'); hold on;
-    plot(arcLength/1000, alt_m/1000);
-    %fprintf("Final X,Y: [%.3f, %.3f]\n",X(end,2),X(end,3))
-    xlabel('North km'); ylabel('Up km'); title('Range vs Altitude');
-    grid on; yline(0, 'Color', [1 0.2 0.2]);
-    ylim([0,50]);
-    subtitle(sprintf("East Error: %.2f m\n North Error: %.2f\n Up Error: %.2f", East(end), North(end), Up(end)));
+    plot(arcLength/1000, alt_m/1000, 'b-', 'DisplayName','Constrained (Sim)');
+    
+    if hasUC
+        rhatUC      = rDimUC ./ vecnorm(rDimUC,2,2);
+        centralUC   = acos(rhatUC*U0);
+        arcLengthUC = rMoon * centralUC;
+        plot(arcLengthUC/1000, alt_m_UC/1000, 'r-', 'DisplayName','Unconstrained (Sim)');
+    end
+
+    xlabel('Range (km)'); ylabel('Up (km)');
+    title('Range vs Altitude (Sim)'); grid on;
+    legend('Location','best');
+    if hasUC
+        subtitle(sprintf(['Final positions (East, North, Up)\n' ...
+            'Constrained: (%.1f, %.1f, %.1f) m\n' ...
+            'Unconstrained: (%.1f, %.1f, %.1f) m'], ...
+            East(end), North(end), Up(end), ...
+            EastUC(end), NorthUC(end), UpUC(end)));
+    else
+        subtitle(sprintf('Final position (East, North, Up): (%.1f, %.1f, %.1f) m', ...
+            East(end), North(end), Up(end)));
+    end
 
 % Figure 3: Thrust acceleration components (dimensional) ENU
     figure('Name','Sim ENU Accel'); hold on;
@@ -293,23 +375,43 @@ function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim
 
 % Figure 6: Throttle profile (display limits only)
     figure('Name','Sim Throttle'); hold on;
-    % Thrust magnitude = ||aT|| * m, dimensional thrust = a * m * A_ref * M_ref
-    thrustDim = aTDimNorm' .* mDim;%/maxThrustDim;
-    plot(tTraj*T_ref, thrustDim/maxThrustDim,'DisplayName','Throttle Profile');
-    yline(1.0, 'r--', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
-    yline(minThrustDim/maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
-    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle');
-    legend()
+    thrustDim = aTDimNorm' .* mDim;
+    plot(tTraj*T_ref, thrustDim/maxThrustDim, 'b-', 'DisplayName','Constrained (Sim)');
+    if hasUC
+        thrustDimUC = aTDimNormUC .* mDimUC;
+        plot(tTrajUC*T_ref, thrustDimUC/maxThrustDim, 'r-', 'DisplayName','Unconstrained (Sim)');
+    end
+    yline(1.0,'r--','LineWidth',1,'DisplayName','Max Throttle'); yline(minThrustDim/maxThrustDim,'r--','LineWidth',1,'DisplayName','Min Throttle');
+    xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle (Sim)'); legend('Location','best'); grid on;
 
-% Figure 7: Mass depletion over ND time
-    figure('Name','Sim Mass'); hold on;
-    plot(tTraj*T_ref, mState*M_ref, 'LineWidth', 2);
-    yline(massInitDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Initial');
-    yline(massDryDim, 'g--', 'LineWidth', 1, 'DisplayName', 'Dry');
-    xlabel('Time (s)'); ylabel('Mass (kg)'); title('Mass Depletion');
-    legend('Current', 'Initial', 'Dry', 'Location', 'northeast');
-    grid on;
-    subtitle(sprintf("Consumed Fuel: %.2f kg", massInitDim - mState(end)*M_ref));
+% Figure 7: Mass depletion over time
+    figure('Name','Sim Mass Depletion'); hold on; grid on;
+    
+    % Constrained
+    plot(tTraj*T_ref, mDim, 'b-', 'LineWidth', 2, 'DisplayName','Constrained (Sim)');
+    
+    % Unconstrained
+    if hasUC
+        plot(tTrajUC*T_ref, mDimUC, 'r-', 'LineWidth', 1.5, 'DisplayName','Unconstrained (Sim)');
+    end
+    
+    xlabel('Time s');
+    ylabel('Mass kg');
+    title('Vehicle Mass vs Time');
+    legend('Location','best');
+    
+    % --- Summaries for the subtitle ---
+    propUsedC  = max(0, mDim(1) - mDim(end));
+    if hasUC
+        propUsedU = max(0, mDimUC(1) - mDimUC(end));
+        subtitle(sprintf(['Final mass and propellant used\n' ...
+            'Constrained: m_f = %.1f kg, used = %.1f kg\n' ...
+            'Unconstrained: m_f = %.1f kg, used = %.1f kg'], ...
+            mDim(end), propUsedC, mDimUC(end), propUsedU));
+    else
+        subtitle(sprintf('Final mass = %.1f kg, propellant used = %.1f kg', ...
+            mDim(end), propUsedC));
+    end
 
 % Figure 8: Time vs Altituide
     figure('Name','Sim Alt'); hold on;
