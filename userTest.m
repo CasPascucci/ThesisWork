@@ -46,9 +46,3 @@ verboseOutput = true;
 
 [gammaOpt, krOpt, tgoOpt,~,~, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput);
 % tgoOpt returned in seconds
-% Print Values
-gammaOpt
-krOpt
-tgoOpt
-optFuelCost
-simFuelCost

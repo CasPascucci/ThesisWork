@@ -53,11 +53,6 @@ function [gammaOpt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, 
 %   gammaOpt, krOpt, tgoOpt: optimal parameters for FP2PDG from the given
 %                            conditions
 %   fuelCost: Estimated fuel cost from simulation of flight
-if nargin < 6
-    betaParam = 0.65;
-elseif nargin < 7
-    doPlots = false;
-end
 if nargin < 9
     dispersion = false;
 end
