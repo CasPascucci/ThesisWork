@@ -35,9 +35,10 @@ optimizationParams = struct;
 optimizationParams.nodeCount = 997; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
 optimizationParams.glideSlopeEnabled = true;
-optimizationParams.pointingEnabled = false;
+optimizationParams.pointingEnabled = true;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.maxTiltRate = 5; %deg/s
+optimizationParams.minPointing = 10; %deg, floor for pointing constraint
 
 beta = 0.85;
 doPlotting = true; % disable this to not plot results

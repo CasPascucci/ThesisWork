@@ -24,37 +24,19 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     lb = [1e-6, 0, 0.01];
     ub = [8, 30, 11];
 
-    if optimParams.pointingEnabled
-        if dispersion
-            fminconOptions = optimoptions('fmincon', 'Display','none', 'MaxFunctionEvaluations', 10000, ...
-            'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
-            'Algorithm','active-set', 'EnableFeasibilityMode',true, ...
-            'HessianApproximation','lbfgs');
-        else
-            fminconOptions = optimoptions('fmincon', 'Display','final', 'MaxFunctionEvaluations', 10000, ...
-            'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
-            'Algorithm','active-set', 'EnableFeasibilityMode',true, ...
-            'HessianApproximation','lbfgs');
-        end
+    if dispersion
+        fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
+        'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
+        'Algorithm','interior-point', 'EnableFeasibilityMode',true, ...
+        'HessianApproximation','lbfgs');
     else
-        if dispersion
-            fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
-            'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
-            'Algorithm','interior-point', 'EnableFeasibilityMode',true, ...
-            'HessianApproximation','lbfgs');
-        else
-            fminconOptions = optimoptions('fmincon', 'Display', 'final', 'MaxFunctionEvaluations', 10000, ...
-            'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
-            'Algorithm','interior-point', 'EnableFeasibilityMode',true, ...
-            'HessianApproximation','lbfgs');
-        end
-
+        fminconOptions = optimoptions('fmincon', 'Display', 'final', 'MaxFunctionEvaluations', 10000, ...
+        'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
+        'Algorithm','interior-point', 'EnableFeasibilityMode',true, ...
+        'HessianApproximation','lbfgs','HonorBounds',false);
     end
+
     nodeCount = optimParams.nodeCount;
-
-
-    %[rfStar, vfStar, afStar, tgoVirt] = computeBeyondTerminationTargeting(r0, v0, paramsX0(1), paramsX0(2), rfStar, vfStar, afStar, delta_t, paramsX0(3), gConst);
-    %paramsX0(3) = tgoVirt
 
     obj = @(params) objectiveFunction(params, betaParam, afStar, rfStar, r0, vfStar, v0, gConst, nonDimParams, optimParams);
     nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimParams, problemParams, refVals);
@@ -75,7 +57,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
         fprintf('  tgo   = %.6f (s)\n', optParams(3)* refVals.T_ref);
     
         [c, ~] = nonlincon(optParams);
-        activeIneq = find(c >= 0); % Nearly active
+        activeIneq = find(c >= -1e-6); % Nearly active
         fprintf('\nActive inequality constraints: %d/%d\n', length(activeIneq), length(c));
         [maxViolation, idx] = max(c);
         fprintf('Max violation: %.3f at constraint %d\n', maxViolation, idx);
@@ -139,7 +121,7 @@ end
 function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimParams, problemParams, refVals)
     nodeCount = optimParams.nodeCount;
     glideSlopeFlag = optimParams.glideSlopeEnabled;
-    %pointingFlag = optimParams.pointingEnabled;
+    pointingFlag = optimParams.pointingEnabled;
     gamma  = params(1);
     kr     = params(2);
     tgo0   = params(3);
@@ -162,8 +144,13 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     m = m0 .* exp(-Q);
 
     thrust = m .*(aTmag);
+    if pointingFlag
+        margin_top = 0.95;
+    else
+        margin_top = 1.00;
+    end
 
-    upper = thrust - (maxThrust);
+    upper = thrust - (margin_top*maxThrust);
     lower = minThrust - thrust;
 
     c = [upper(:); lower(:)];
@@ -200,20 +187,22 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     end
     
 
-    % if pointingFlagg
-    %     aTTOPO = MCMF2ENU(aT,problemParams.landingLatDeg,problemParams.landingLonDeg,false,false);
-    %     aTmagTOPO = vecnorm(aTTOPO,2,1);
-    %     thrustUnitVec = aTTOPO./aTmagTOPO;
-    %     vertUnitVec = [0;0;1];
-    %     dotProducts = thrustUnitVec'*vertUnitVec;
-    %     dotProducts = min(1,max(-1,dotProducts));
-    %     phi = acosd(dotProducts); % Values at idx 1 are landing, idx end are PDI, Deg
-    %     phiR = (optimParams.maxTiltRate * refVals.T_ref)* tgospan; % DEG
-    %     phiA = 0.5 * (optimParams.maxTiltAccel * refVals.T_ref^2) * (tgospan.^2); % DEG
-    %     phiLimit = min(min(phiR,phiA),90)';
-    %     %phiLimit = max(phiLimit,0.1); % Adds a 0.1 degree floor, useful for final nodes to touchdown when constraint is basically 0
-    % 
-    %     cPointing = phi - (phiLimit); % phi - phiLim <= 0
-    %     c(3*nodeCount+4:4*nodeCount) = cPointing(4:end); % Currently not imposing in last few nodes before landing
-    % end
+    if pointingFlag 
+        aTTOPO = MCMF2ENU(aT,problemParams.landingLatDeg,problemParams.landingLonDeg,false,false);
+        aTmagTOPO = vecnorm(aTTOPO,2,1);
+        thrustUnitVec = aTTOPO./aTmagTOPO;
+        vertUnitVec = [0;0;1];
+        dotProducts = thrustUnitVec'*vertUnitVec;
+        phi = acosd(dotProducts); % Values at idx 1 are landing, idx end are PDI, Deg
+        phi0 = optimParams.minPointing;
+        phiA = 0.5 * (optimParams.maxTiltAccel * refVals.T_ref^2) * (tgospan(:).^2); % DEG
+        Theta = zeros(nodeCount,1);
+        idxCon1 = (phiA + phi0) >= 180;
+        Theta(idxCon1) = 180;
+        idxCon2 = ~idxCon1;
+        Theta(idxCon2) = phiA(idxCon2) + phi0;
+
+        cPoint = phi - Theta;
+        c = [c;cPoint];
+    end
 end
