@@ -198,46 +198,9 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
         end
         c = [c; cGlide];
     end
-    % if glideSlopeFlag
-    %     glideNodes = max(1, floor(0.20*nodeCount));   % first 20% of indices (end of flight)
-    %     freeGlideNodes = max(1, floor(0.02*nodeCount));   % first 2% of indices
-    %     idx = 1:glideNodes;
-    % 
-    %     % calc TOPO radius, tgospan works from landing backwards
-    %     tgospanGlide = tgospan(idx);
-    %     phi1hat = (tgospanGlide.^(gamma1+2))./((gamma1+1)*(gamma1+2));
-    %     phi2hat = (tgospanGlide.^(gamma2+2))./((gamma2+1)*(gamma2+2));
-    %     rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospanGlide + 0.5*(gConst+afStar).*tgospanGlide.^2;
-    %     rdOptimTOPO = MCMF2ENU(rdOptim, problemParams.landingLatDeg, problemParams.landingLonDeg, true, false);
-    % 
-    %     % unit vectors
-    %     rdNorms = vecnorm(rdOptimTOPO,2,1);
-    %     rUnitVec = rdOptimTOPO ./ max(rdNorms, 1e-12);
-    %     vertUnitVec = [0;0;1];
-    % 
-    %     % calc altitude
-    %     rMoon     = problemParams.rMoon;
-    %     rdDim     = rdOptim * refVals.L_ref;
-    %     alt_opt   = vecnorm(rdDim,2,1) - rMoon;
-    % 
-    %     %fraction for how far through linear theta transition
-    %     frac = (alt_opt - 250)/250;     % 0 below 250 m, 1 at 500 m and above
-    %     frac(frac < 0) = 0;
-    %     frac(frac > 1) = 1;
-    %     theta = (frac*45) + 45;         % degrees from vertical
-    % 
-    %     % first 2% of indices are the very end of flight -> set to 90 deg
-    %     theta(1:freeGlideNodes) = 90;
-    % 
-    %     % constraint: angle(rhat, zhat) <= theta  <=>  rhat·zhat >= cos(theta)
-    %     % so cGlide = cos(theta) - (rhat·zhat) <= 0
-    %     cGlide = cosd(theta) - sum(rUnitVec .* vertUnitVec, 1);
-    % 
-    %     % append
-    %     c = [c; cGlide(:)];
-    % end
+    
 
-    % if pointingFlag
+    % if pointingFlagg
     %     aTTOPO = MCMF2ENU(aT,problemParams.landingLatDeg,problemParams.landingLonDeg,false,false);
     %     aTmagTOPO = vecnorm(aTTOPO,2,1);
     %     thrustUnitVec = aTTOPO./aTmagTOPO;

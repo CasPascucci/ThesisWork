@@ -1,5 +1,5 @@
 clear all; clc;
-% All values are dimensional
+% All values are dimensional values
 PDINom = struct;
 PDINom.altitude_km        = 13.36;
 PDINom.lonInitDeg         = 41.85;
@@ -38,7 +38,7 @@ optimizationParams.pointingEnabled = false;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.maxTiltRate = 5; %deg/s
 
-beta = 0.65;
+beta = 0.8;
 doPlotting = false; % disable this to not plot results
 verboseOutput = false;
 
@@ -78,7 +78,7 @@ Results = struct('k',{},'gamma',{},'kr',{},'tgo',{},'fuel_opt',{},...
 
 L_ref = 10000; A_ref = planetaryParams.gPlanet; T_ref = sqrt(L_ref/A_ref); V_ref = L_ref/T_ref; M_ref = 15103.0;
 dispTime = tic;
-parfor idx = 1:caseCount
+parfor (idx = 1:caseCount,6)
     try
         dalt = seeds.alt_seeds(idx) * (r_disp / 3);
         dlon = seeds.lon_seeds(idx) * (lon_disp / 3);
@@ -127,10 +127,16 @@ if ~exist('Dispersion','dir')
 end
 
 timeRun = datestr(now,'yyyymmdd_HHMMSS');
-runDir = fullfile('Dispersion', timeRun);
+numCon = optimizationParams.glideSlopeEnabled + optimizationParams.pointingEnabled;
+betaVal = beta*100;
+suffix = sprintf('_%dcon_%dbeta', numCon, round(betaVal));
+runName = [timeRun suffix];
+runDir = fullfile('Dispersion', runName);
 mkdir(runDir);
-matfile = fullfile(runDir, ['results_dispersion_' timeRun '.mat']);
-csvfile = fullfile(runDir, ['results_dispersion_' timeRun '.csv']);
+
+
+matfile = fullfile(runDir, ['results_dispersion_' runName '.mat']);
+csvfile = fullfile(runDir, ['results_dispersion_' runName '.csv']);
 
 save(matfile,'Results');
 
@@ -141,3 +147,6 @@ writetable(T, csvfile);
 
 
 statsPlotting(Results);
+
+Exit_Results = tabulate([Results.exitflag]);
+disp(num2str(Exit_Results));

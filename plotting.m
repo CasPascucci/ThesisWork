@@ -1,4 +1,4 @@
-% Plotting function
+% Plotting function for Single Runs
 function plotting(tTraj, stateTraj, optParams, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, unconstrained)
     gamma = optParams(1);
     kr = optParams(2);

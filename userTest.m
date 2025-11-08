@@ -1,5 +1,5 @@
 clear all; close all; clc; format short
-%% Test function to see user experience for getParams() function calls
+%% Function to use for Single Runs
 % All values are dimensional
 PDIState = struct;
 PDIState.altitude_km        = 13.36;
@@ -39,7 +39,7 @@ optimizationParams.pointingEnabled = false;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.maxTiltRate = 5; %deg/s
 
-beta = 0.65;
+beta = 0.85;
 doPlotting = true; % disable this to not plot results
 verboseOutput = true;
 

@@ -1,6 +1,6 @@
 function [gammaOpt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion)
     addpath([pwd, '/CoordinateFunctions']);
-%% Main Function to Run for FP2PDG Optimization
+%% Main Function to Run for FP2PDG Optimization Single or Stat
 % Inputs: All given in dimensional values unless stated otherwise
 %   PDIState:
 %       .altitude_km: Altitude of PDI, km
