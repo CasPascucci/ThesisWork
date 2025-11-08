@@ -1,5 +1,6 @@
 clear all; clc;
 % All values are dimensional values
+% Currently does stats off of Optimization values
 PDINom = struct;
 PDINom.altitude_km        = 13.36;
 PDINom.lonInitDeg         = 41.85;
