@@ -43,7 +43,7 @@ beta = 0.85;
 doPlotting = false; % disable this to not plot results
 verboseOutput = false;
 
-%% Setup Stats Ranges
+%% Setup Stats 3 Sigma Ranges
 seedDir = fileparts(mfilename("fullpath"));
 seedFilenames = struct( ...
     'alt', fullfile(seedDir,'Seeds/alt_seeds.dat'), ...
