@@ -27,23 +27,23 @@ targetState.landingLatDeg      = -90.0;
 targetState.rfLanding = [0;0;0];
 targetState.vfLanding = [0;0;-1];
 targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
-%targetState.afLanding = [0;0;vehicleParams.maxThrust/(6710)]; % This
-                                                               %afStar seems to be too high for a solvable path
+
 targetState.delta_t   = 5; % seconds dim, for btt
 
 optimizationParams = struct;
 optimizationParams.nodeCount = 997; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
 optimizationParams.glideSlopeEnabled = false;
-optimizationParams.pointingEnabled = false;
+optimizationParams.pointingEnabled = true;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.maxTiltRate = 5; %deg/s
+optimizationParams.minPointing = 10; %deg, floor for pointing constraint
 
-beta = 0.8;
+beta = 0.85;
 doPlotting = false; % disable this to not plot results
 verboseOutput = false;
 
-
+%% Setup Stats Ranges
 seedDir = fileparts(mfilename("fullpath"));
 seedFilenames = struct( ...
     'alt', fullfile(seedDir,'Seeds/alt_seeds.dat'), ...
@@ -79,6 +79,7 @@ Results = struct('k',{},'gamma',{},'kr',{},'tgo',{},'fuel_opt',{},...
 
 L_ref = 10000; A_ref = planetaryParams.gPlanet; T_ref = sqrt(L_ref/A_ref); V_ref = L_ref/T_ref; M_ref = 15103.0;
 dispTime = tic;
+%% Stats Loop - Requires Parallel Copmuting Toolbox
 parfor (idx = 1:caseCount,6)
     try
         dalt = seeds.alt_seeds(idx) * (r_disp / 3);
@@ -123,31 +124,141 @@ parfor (idx = 1:caseCount,6)
     end
 end
 elapsed = toc(dispTime)
+
+%% Save Results
 if ~exist('Dispersion','dir')
     mkdir('Dispersion');
 end
 
+% Timestamp for the run
 timeRun = datestr(now,'yyyymmdd_HHMMSS');
-numCon = optimizationParams.glideSlopeEnabled + optimizationParams.pointingEnabled;
-betaVal = beta*100;
-suffix = sprintf('_%dcon_%dbeta', numCon, round(betaVal));
-runName = [timeRun suffix];
-runDir = fullfile('Dispersion', runName);
+
+% Build constraint tags based on which conditions are active
+condTags = {};
+if isfield(optimizationParams,'glideSlopeEnabled') && optimizationParams.glideSlopeEnabled
+    condTags{end+1} = 'GS';
+end
+if isfield(optimizationParams,'pointingEnabled') && optimizationParams.pointingEnabled
+    condTags{end+1} = 'PT';
+end
+if isempty(condTags)
+    condTags = {'NONE'};
+end
+condTag = strjoin(condTags,'_');
+betaVal = beta * 100;
+suffix  = sprintf('%dbeta_%s_%s', round(betaVal), condTag, timeRun);
+
+runName = suffix;
+runDir  = fullfile('Dispersion', runName);
 mkdir(runDir);
 
-
+% Filenames
 matfile = fullfile(runDir, ['results_dispersion_' runName '.mat']);
 csvfile = fullfile(runDir, ['results_dispersion_' runName '.csv']);
 
-save(matfile,'Results');
+% Save results
+save(matfile, 'Results');
 
-T = table( (1:numel(Results)).', [Results.exit_ok].',[Results.gamma].', [Results.kr].', [Results.tgo].', [Results.fuel_opt].', ...
-           [Results.coeff1].', [Results.coeff2].', [Results.coeff3].', [Results.coeff4].', ...
+% Export summary CSV - might need non matlab app to examine results in
+% future
+T = table( (1:numel(Results)).', [Results.exit_ok].',[Results.gamma].', [Results.kr].', ...
+           [Results.tgo].', [Results.fuel_opt].', [Results.coeff1].', [Results.coeff2].', ...
+           [Results.coeff3].', [Results.coeff4].', ...
            'VariableNames', {'k','exit_ok','gamma','kr','tgo','fuel_opt','coeff1','coeff2','coeff3','coeff4'} );
 writetable(T, csvfile);
 
-
+%% Generate Stats Plots and Tables
 statsPlotting(Results);
 
-Exit_Results = tabulate([Results.exitflag]);
-disp(num2str(Exit_Results));
+
+% Stats Summary Table
+vals = struct();
+fields = {'gamma','kr','tgo','fuel_opt','coeff1','coeff2','coeff3','coeff4'};
+
+for f = 1:numel(fields)
+    x = [Results.(fields{f})];
+    ok = [Results.exit_ok];
+    x_ok = x(ok);
+
+    vals.(fields{f}).mean = mean(x_ok);
+    vals.(fields{f}).std  = std(x_ok,0);
+    vals.(fields{f}).min  = min(x_ok);
+    vals.(fields{f}).max  = max(x_ok);
+    vals.(fields{f}).range3sigma = [vals.(fields{f}).mean - 3*vals.(fields{f}).std, ...
+                                    vals.(fields{f}).mean + 3*vals.(fields{f}).std];
+end
+
+% Create summary table
+names = fieldnames(vals);
+meanVals = []; stdVals = []; minVals = []; maxVals = []; lowVals = []; highVals = [];
+
+for i = 1:numel(names)
+    meanVals(i,1) = vals.(names{i}).mean;
+    stdVals(i,1)  = vals.(names{i}).std;
+    minVals(i,1)  = vals.(names{i}).min;
+    maxVals(i,1)  = vals.(names{i}).max;
+    lowVals(i,1)  = vals.(names{i}).range3sigma(1);
+    highVals(i,1) = vals.(names{i}).range3sigma(2);
+
+end
+
+SummaryTable = table(names, meanVals, stdVals, minVals, maxVals, lowVals, highVals, ...
+    'VariableNames', {'Parameter','Mean','StdDev','Min','Max','-3σ','+3σ'});
+
+disp(SummaryTable);
+summaryFile = fullfile(runDir, 'results_dispersion_summary.csv');
+writetable(SummaryTable, summaryFile);
+
+% Exit Flag/Conditions Summary
+allExit = [Results.exitflag]';
+ok      = [Results.exit_ok]';
+N       = numel(allExit);
+
+% Count per unique exit flag
+[uniqFlags, ~, idxu] = unique(allExit);
+counts   = accumarray(idxu, 1);
+percents = 100 * counts / N;
+
+% Exit Flag Meanings for table
+meaning = strings(numel(uniqFlags),1);
+for i = 1:numel(uniqFlags)
+    switch uniqFlags(i)
+        case 1
+            meaning(i) = "Optimality and Constraint tolerances met";
+        case 0
+            meaning(i) = "Stopped by limit";
+        case -2
+            meaning(i) = "Infeasible / no feasible point";
+        case -3
+            meaning(i) = "Constraint tolerance met, went under ObjectiveLimit";
+        case 2
+            meaning(i) = "Under StepTolerance, Constraint tolerance met";
+        otherwise
+            meaning(i) = "Shouldn't be here with interior point";
+    end
+end
+
+ExitFlagTable = table(uniqFlags, counts, percents, meaning, ...
+    'VariableNames', {'ExitFlag','Count','Percent','Meaning'});
+
+% Success/failure roll-up (based on exit_ok)
+succCount = sum(ok);
+failCount = N - succCount;
+succPct   = 100 * succCount / N;
+failPct   = 100 - succPct;
+
+SuccessTable = table( ...
+    categorical({'success';'failure'}), ...
+    [succCount; failCount], ...
+    [succPct;   failPct], ...
+    'VariableNames', {'Outcome','Count','Percent'});
+
+% Save both tables
+exitCsv   = fullfile(runDir, 'exitflag_summary.csv');
+succCsv   = fullfile(runDir, 'success_summary.csv');
+writetable(ExitFlagTable, exitCsv);
+writetable(SuccessTable,  succCsv);
+
+% Table figures
+disp('Exit flag summary:'); disp(ExitFlagTable);
+disp('Success summary:');   disp(SuccessTable);
