@@ -39,6 +39,8 @@ optimizationParams.pointingEnabled = true;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.maxTiltRate = 5; %deg/s
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
+optimizationParams.updateFreq = 10;
+optimizationParams.updateStop = 30;
 
 beta = 0.85;
 doPlotting = true; % disable this to not plot results
