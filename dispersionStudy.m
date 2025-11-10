@@ -210,8 +210,7 @@ SummaryTable = table(names, meanVals, stdVals, minVals, maxVals, lowVals, highVa
     'VariableNames', {'Parameter','Mean','StdDev','Min','Max','-3σ','+3σ'});
 
 disp(SummaryTable);
-summaryFile = fullfile(runDir, 'results_dispersion_summary.csv');
-writetable(SummaryTable, summaryFile);
+
 
 % Exit Flag/Conditions Summary
 allExit = [Results.exitflag]';
@@ -257,18 +256,21 @@ SuccessTable = table( ...
     [succPct;   failPct], ...
     'VariableNames', {'Outcome','Count','Percent'});
 
-% Save both tables
-exitCsv   = fullfile(runDir, 'exitflag_summary.csv');
-succCsv   = fullfile(runDir, 'success_summary.csv');
-writetable(ExitFlagTable, exitCsv);
-writetable(SuccessTable,  succCsv);
+
 
 % Table figures
 disp('Exit flag summary:'); disp(ExitFlagTable);
 disp('Success summary:');   disp(SuccessTable);
 
+%% Save both tables
+exitCsv   = fullfile(runDir, 'exitflag_summary.csv');
+succCsv   = fullfile(runDir, 'success_summary.csv');
+writetable(ExitFlagTable, exitCsv);
+writetable(SuccessTable,  succCsv);
+summaryFile = fullfile(runDir, 'results_dispersion_summary.csv');
+writetable(SummaryTable, summaryFile);
 
-% Progress Bar Function
+%% Progress Bar Function
 function [queue, done] = waitBarQueue(caseCount, titleStr)
     queue = parallel.pool.DataQueue;
     p = 0;
