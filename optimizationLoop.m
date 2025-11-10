@@ -1,4 +1,4 @@
-function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimParams, refVals, delta_t, verboseOutput, dispersion)
+function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_t, verboseOutput, dispersion)
     if nargin < 9
         dispersion = false;
     end
@@ -36,10 +36,10 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
         'HessianApproximation','lbfgs','HonorBounds',false);
     end
 
-    nodeCount = optimParams.nodeCount;
+    nodeCount = optimizationParams.nodeCount;
 
-    obj = @(params) objectiveFunction(params, betaParam, afStar, rfStar, r0, vfStar, v0, gConst, nonDimParams, optimParams);
-    nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimParams, problemParams, refVals);
+    obj = @(params) objectiveFunction(params, betaParam, afStar, rfStar, r0, vfStar, v0, gConst, nonDimParams, optimizationParams);
+    nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals);
 
     
     [optParams, optCost, exitflag, output] = fmincon(obj, paramsX0, Aineq, bineq, [], [], lb, ub, nonlincon, fminconOptions);
@@ -94,11 +94,11 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     
 end
 %% Functions
-function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, v, gConst, nonDimParams, optimParams)
+function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, v, gConst, nonDimParams, optimizationParams)
     gamma  = params(1);
     kr     = params(2);
     tgo   = params(3);
-    nodeCount = optimParams.nodeCount;
+    nodeCount = optimizationParams.nodeCount;
 
     gamma1 = gamma;
     gamma2 = kr/(gamma+2) - 2;
@@ -118,10 +118,10 @@ function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, 
 
 end
 
-function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimParams, problemParams, refVals)
-    nodeCount = optimParams.nodeCount;
-    glideSlopeFlag = optimParams.glideSlopeEnabled;
-    pointingFlag = optimParams.pointingEnabled;
+function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals)
+    nodeCount = optimizationParams.nodeCount;
+    glideSlopeFlag = optimizationParams.glideSlopeEnabled;
+    pointingFlag = optimizationParams.pointingEnabled;
     gamma  = params(1);
     kr     = params(2);
     tgo0   = params(3);
@@ -194,8 +194,8 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
         vertUnitVec = [0;0;1];
         dotProducts = thrustUnitVec'*vertUnitVec;
         phi = acosd(dotProducts); % Values at idx 1 are landing, idx end are PDI, Deg
-        phi0 = optimParams.minPointing;
-        phiA = 0.5 * (optimParams.maxTiltAccel * refVals.T_ref^2) * (tgospan(:).^2); % DEG
+        phi0 = optimizationParams.minPointing;
+        phiA = 0.5 * (optimizationParams.maxTiltAccel * refVals.T_ref^2) * (tgospan(:).^2); % DEG
         Theta = zeros(nodeCount,1);
         idxCon1 = (phiA + phi0) >= 180;
         Theta(idxCon1) = 180;

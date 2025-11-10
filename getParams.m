@@ -198,7 +198,12 @@ if ~dispersion
 end
 % Plotting Handling
     if nargout > 5 || doPlots
-        [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = closedLoopSim(gammaOpt, krOpt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
+        reopt = true;
+        if ~ reopt
+            [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = closedLoopSim(gammaOpt, krOpt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
+        else
+            [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, exitFlags] = simReOpt(gammaOpt,krOpt,tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
+        end
         simFuelCost = M_ref*(stateTraj(1,7) - stateTraj(end,7));
         finalPosSim = MCMF2ENU(stateTraj(end,1:3)'*L_ref,landingLatDeg,landingLonDeg,true,true);
         if doPlots
