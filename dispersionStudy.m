@@ -1,4 +1,4 @@
-clear all; clc;
+clear all; clc; close all;
 % All values are dimensional values
 % Currently does stats off of Optimization values
 PDINom = struct;
@@ -34,7 +34,7 @@ optimizationParams = struct;
 optimizationParams.nodeCount = 997; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
 optimizationParams.glideSlopeEnabled = false;
-optimizationParams.pointingEnabled = true;
+optimizationParams.pointingEnabled = false;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.maxTiltRate = 5; %deg/s
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
@@ -73,14 +73,14 @@ azmth_disp = 0.2; % deg
 mass_disp = 0.0066; % fraction of nominal mass
 
 caseCount = numel(seeds.alt_seeds);
-
-Results = struct('k',{},'gamma',{},'kr',{},'tgo',{},'fuel_opt',{},...
-    'coeff1',{},'coeff2',{},'coeff3',{},'coeff4',{},'exit_ok',{},'msg',{}, 'exitflag',{});
+[queue, done] = waitBarQueue(caseCount, 'Dispersion');
+Results = struct('k',{},'gamma',{},'kr',{},'tgo',{},'fuel_opt',{},'fuel_sim',{},...
+    'final_error',{},'coeff1',{},'coeff2',{},'coeff3',{},'coeff4',{},'exit_ok',{},'msg',{}, 'exitflag',{});
 
 L_ref = 10000; A_ref = planetaryParams.gPlanet; T_ref = sqrt(L_ref/A_ref); V_ref = L_ref/T_ref; M_ref = 15103.0;
 dispTime = tic;
 %% Stats Loop - Requires Parallel Copmuting Toolbox
-parfor (idx = 1:caseCount,6)
+parfor (idx = 1:caseCount)
     try
         dalt = seeds.alt_seeds(idx) * (r_disp / 3);
         dlon = seeds.lon_seeds(idx) * (lon_disp / 3);
@@ -97,19 +97,21 @@ parfor (idx = 1:caseCount,6)
         PDI.inertialVelocity = PDINom.inertialVelocity + dv;
         PDI.flightPathAngleDeg = PDINom.flightPathAngleDeg + dfpa;
         PDI.azimuth = PDINom.azimuth + dazmth*pi/180;
-        
+
         vehicle = vehicleNom;
         vehicle.massInit = vehicleNom.massInit * (1+ mass_mult);
         vehicle.dryMass = vehicle.massInit - 8248; % this way makes the dry mass variable but fuel amount constant
-        
 
-        [gammaOpt, krOpt, tgoOpt, aTOpt, exitflag, optFuel] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, beta, false, false, true);
-        
+
+        [gammaOpt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, beta, false, false, true);
+
         Results(idx).k = idx;
         Results(idx).gamma = gammaOpt;
         Results(idx).kr = krOpt;
         Results(idx).tgo = tgoOpt;
         Results(idx).fuel_opt = optFuel;
+        Results(idx).fuel_sim = simFuel; % New
+        Results(idx).final_error = finalPosSim; % New
         Results(idx).coeff1 = gammaOpt*(krOpt/(2*gammaOpt +4) -1);
         Results(idx).coeff2 = (gammaOpt*krOpt/(2*gammaOpt+4)-gammaOpt-1);
         Results(idx).coeff3 = ((gammaOpt+1)/tgoOpt)*(1-krOpt/(gammaOpt+2));
@@ -122,8 +124,10 @@ parfor (idx = 1:caseCount,6)
         Results(idx).exit_ok = false;
         Results(idx).msg = ME.message;
     end
+    send(queue,1);
 end
 elapsed = toc(dispTime)
+done();
 
 %% Save Results
 if ~exist('Dispersion','dir')
@@ -162,18 +166,18 @@ save(matfile, 'Results');
 % Export summary CSV - might need non matlab app to examine results in
 % future
 T = table( (1:numel(Results)).', [Results.exit_ok].',[Results.gamma].', [Results.kr].', ...
-           [Results.tgo].', [Results.fuel_opt].', [Results.coeff1].', [Results.coeff2].', ...
+           [Results.tgo].', [Results.fuel_opt].', [Results.fuel_sim].', [Results.final_error].', [Results.coeff1].', [Results.coeff2].', ...
            [Results.coeff3].', [Results.coeff4].', ...
-           'VariableNames', {'k','exit_ok','gamma','kr','tgo','fuel_opt','coeff1','coeff2','coeff3','coeff4'} );
+           'VariableNames', {'k','exit_ok','gamma','kr','tgo','fuel_opt','fuel_sim','final_error','coeff1','coeff2','coeff3','coeff4'} );
 writetable(T, csvfile);
 
 %% Generate Stats Plots and Tables
-statsPlotting(Results);
+statsPlotting(Results); % Only plots results with flag 1 or 2
 
 
 % Stats Summary Table
 vals = struct();
-fields = {'gamma','kr','tgo','fuel_opt','coeff1','coeff2','coeff3','coeff4'};
+fields = {'gamma','kr','tgo','fuel_opt','fuel_sim','coeff1','coeff2','coeff3','coeff4'};
 
 for f = 1:numel(fields)
     x = [Results.(fields{f})];
@@ -262,3 +266,22 @@ writetable(SuccessTable,  succCsv);
 % Table figures
 disp('Exit flag summary:'); disp(ExitFlagTable);
 disp('Success summary:');   disp(SuccessTable);
+
+
+% Progress Bar Function
+function [queue, done] = waitBarQueue(caseCount, titleStr)
+    queue = parallel.pool.DataQueue;
+    p = 0;
+    h = waitbar(0, sprintf('0 / %d', caseCount), 'Name', titleStr);
+
+    afterEach(queue, @updateWait);
+
+    function updateWait(~)
+        p = p + 1;
+        if isvalid(h)
+            waitbar(p/caseCount, h, sprintf('%d / %d', p, caseCount));
+        end
+    end
+
+    done = @() (delete(h));
+end

@@ -1,4 +1,4 @@
-function [gammaOpt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion)
+function [gammaOpt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion)
     addpath([pwd, '/CoordinateFunctions']);
 %% Main Function to Run for FP2PDG Optimization Single or Stat
 % Inputs: All given in dimensional values unless stated otherwise
@@ -198,10 +198,11 @@ if ~dispersion
 end
 % Plotting Handling
     if nargout > 5 || doPlots
-        [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gammaOpt, krOpt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
+        [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = closedLoopSim(gammaOpt, krOpt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
         simFuelCost = M_ref*(stateTraj(1,7) - stateTraj(end,7));
+        finalPosSim = MCMF2ENU(stateTraj(end,1:3)'*L_ref,landingLatDeg,landingLonDeg,true,true);
         if doPlots
-            plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained);
+            plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained);
         end
     end
 end

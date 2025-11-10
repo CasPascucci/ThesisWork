@@ -44,5 +44,5 @@ beta = 0.85;
 doPlotting = true; % disable this to not plot results
 verboseOutput = true;
 
-[gammaOpt, krOpt, tgoOpt,~,~, optFuelCost, simFuelCost, aTList] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput);
+[gammaOpt, krOpt, tgoOpt,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput);
 % tgoOpt returned in seconds
