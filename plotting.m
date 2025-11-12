@@ -207,12 +207,13 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     ylabel('North (km)');
     zlabel('Up (km)');
     title('3D Trajectory with Cosine-Based Glide-Slope Envelope (2%–20% nodes)');
+    subtitle(sprintf("Constrained - gamma: %.2f, kr: %.2f, tgo: %.2f \n Thrust Only - gamma: %.2f, kr: %.2f, tgo: %.2f s", optParams(1),optParams(2),optParams(3)*T_ref,unconstrained.optParams(1),unconstrained.optParams(2),unconstrained.optParams(3)*T_ref));
     view(80, 15); camproj orthographic;
     zlim([0,2]);
     xlim([-3,3]);
     ylim([-3,3]);
     axis square;
-    legend("Constrained Trajectory","","","Unconstrained Trajectory","Location","bestoutside");
+    legend("Constrained Trajectory","","","Thrust Constraint Only Trajectory","Location","bestoutside");
 
 
 
@@ -318,10 +319,10 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
     xlabel('East (km)'); ylabel('North (km)'); zlabel('Up (km)');
     title('3D Trajectory (Sim) with Cosine-Based Glide-Slope Envelope, Final 2 KM');
-    subtitle(sprintf("Optim - gamma: %.2f, kr: %.2f, tgo: %.2f \n UC - gamma: %.2f, kr: %.2f, tgo: %.2f s", optParams(1),optParams(2),optParams(3)*T_ref,unconstrained.optParams(1),unconstrained.optParams(2),unconstrained.optParams(3)*T_ref));
+    subtitle(sprintf("Constrained - gamma: %.2f, kr: %.2f, tgo: %.2f \n Thrust Only - gamma: %.2f, kr: %.2f, tgo: %.2f s", optParams(1),optParams(2),optParams(3)*T_ref,unconstrained.optParams(1),unconstrained.optParams(2),unconstrained.optParams(3)*T_ref));
     view(80, 15); camproj orthographic;
     zlim([0, 2]); xlim([-3,3]); ylim([-3,3]); axis square;
-    legend("","","Constrained Trajectory","Unconstrained Trajectory","Location","bestoutside");
+    legend("","","Constrained Trajectory","Thrust Constraint Only Trajectory","Location","bestoutside");
 
 % Figure 2: Range vs Altitude
     rhat      = rDim ./ vecnorm(rDim,2,2);

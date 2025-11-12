@@ -60,12 +60,12 @@ end
 
 
 % PDI Breakout:
-altitude_km        = PDIState.altitude_km;
+altitude_km        = PDIState.altitude / 1000;
 lonInitDeg         = PDIState.lonInitDeg;
 latInitDeg         = PDIState.latInitDeg;
 inertialVelocity   = PDIState.inertialVelocity;
 flightPathAngleDeg = PDIState.flightPathAngleDeg;
-azimuth            = PDIState.azimuth;
+azimuth            = PDIState.azimuth * pi / 180;
 
 % Target State Breakout:
 landingLonDeg      = targetState.landingLonDeg;

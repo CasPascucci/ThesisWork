@@ -2,12 +2,12 @@ clear all; clc; close all;
 % All values are dimensional values
 % Currently does stats off of Optimization values
 PDINom = struct;
-PDINom.altitude_km        = 13.36;
+PDINom.altitude        = 15240;
 PDINom.lonInitDeg         = 41.85;
 PDINom.latInitDeg         = -71.59;
 PDINom.inertialVelocity   = 1693.8;
 PDINom.flightPathAngleDeg = 0;
-PDINom.azimuth            = pi;
+PDINom.azimuth            = 180;
 
 planetaryParams = struct;
 planetaryParams.rPlanet = 1736.01428 * 1000; % m
@@ -91,7 +91,7 @@ parfor (idx = 1:caseCount)
         mass_mult = seeds.mass_seeds(idx) * (mass_disp / 3);
 
         PDI = PDINom;
-        PDI.altitude_km = PDINom.altitude_km + dalt/1000;
+        PDI.altitude_km = PDINom.altitude / 1000 + dalt/1000;
         PDI.lonInitDeg = PDINom.lonInitDeg + dlon;
         PDI.latInitDeg = PDINom.latInitDeg + dlat;
         PDI.inertialVelocity = PDINom.inertialVelocity + dv;

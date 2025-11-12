@@ -68,10 +68,16 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
 
     gamma1 = optParams(1);
     gamma2 = optParams(2)/(optParams(1)+2) - 2;
+    if gamma1 < 0
+        gamma1 = 0;
+    end
+    if gamma2 < 0
+        gamma2 = 0;
+    end
 
     [c1, c2] = calculateCoeffs(r0, v0, optParams(3), gamma1, gamma2, afStar, rfStar, vfStar, gConst);
 
-    tgospan = linspace(0,optParams(3),nodeCount);
+    tgospan = linspace(1e-6,optParams(3),nodeCount);
     %tspan = optParams(3) - tgospan;
 
     aTOptim = afStar + c1*tgospan.^gamma1 + c2*tgospan.^gamma2;
@@ -102,11 +108,17 @@ function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, 
 
     gamma1 = gamma;
     gamma2 = kr/(gamma+2) - 2;
+    if gamma1 < 0
+        gamma1 = 0;
+    end
+    if gamma2 < 0
+        gamma2 = 0;
+    end
 
     
     [c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, afStar, rfStar, vfStar, gConst);
 
-    tspan = linspace(0,tgo,nodeCount);
+    tspan = linspace(1e-6,tgo,nodeCount);
 
     aT = afStar + c1*tspan.^gamma1 + c2*tspan.^gamma2;
     aTmag = vecnorm(aT,2,1);
@@ -133,7 +145,7 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
 
 
     [c1, c2] = calculateCoeffs(r0, v0, tgo0, gamma1, gamma2, afStar, rfStar, vfStar, gConst);
-    tgospan = linspace(0,tgo0,nodeCount);
+    tgospan = linspace(1e-6,tgo0,nodeCount);
 
     aT = afStar + c1*tgospan.^gamma1 + c2*tgospan.^gamma2;
     aTmag = vecnorm(aT,2,1);
