@@ -2,7 +2,7 @@ clear all; close all; clc; format short
 %% Function to use for Single Runs
 % All values are dimensional
 PDIState = struct;
-PDIState.altitude           = 15240; % m
+PDIState.altitude           = 13360; % m
 PDIState.lonInitDeg         = 41.85; % deg
 PDIState.latInitDeg         = -71.59; % deg
 PDIState.inertialVelocity   = 1693.8; % m/s
@@ -35,7 +35,7 @@ optimizationParams = struct;
 optimizationParams.nodeCount = 997; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
 optimizationParams.glideSlopeEnabled = true;
-optimizationParams.pointingEnabled = true;
+optimizationParams.pointingEnabled = false;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
 
