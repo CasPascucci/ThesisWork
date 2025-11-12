@@ -2,7 +2,7 @@ clear all; close all; clc; format short
 %% Function to use for Single Runs
 % All values are dimensional
 PDIState = struct;
-PDIState.altitude           = 13360; % m
+PDIState.altitude           = 15240; % m
 PDIState.lonInitDeg         = 41.85; % deg
 PDIState.latInitDeg         = -71.59; % deg
 PDIState.inertialVelocity   = 1693.8; % m/s

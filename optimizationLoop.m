@@ -168,7 +168,7 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     c = [upper(:); lower(:)];
     ceq = [];
     if glideSlopeFlag
-        glideNodes = floor(nodeCount*0.20);
+        glideNodes = floor(nodeCount*0.15);
         freeGlideNodes = floor(nodeCount*0.02) + 1;
         tgospanGlide = tgospan(1:glideNodes);
         phi1hat = (tgospanGlide.^(gamma1+2))./((gamma1+1)*(gamma1+2));
