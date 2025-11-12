@@ -21,8 +21,8 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
               0  0 -1];     % tgo >= 0.01
     bineq = [-1e-6; -4-1e-4; -0.01];
 
-    lb = [1e-6, 0, 0.01];
-    ub = [8, 30, 11];
+    lb = [1e-6, 1e-6, 0.01];
+    ub = [12, 45, 15];
 
     if dispersion
         fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
@@ -156,7 +156,7 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     c = [upper(:); lower(:)];
     ceq = [];
     if glideSlopeFlag
-        glideNodes = floor(nodeCount*0.20);
+        glideNodes = floor(nodeCount*0.15);
         freeGlideNodes = floor(nodeCount*0.02) + 1;
         tgospanGlide = tgospan(1:glideNodes);
         phi1hat = (tgospanGlide.^(gamma1+2))./((gamma1+1)*(gamma1+2));
