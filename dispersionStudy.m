@@ -31,7 +31,7 @@ targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
 targetState.delta_t   = 5; % seconds dim, for btt
 
 optimizationParams = struct;
-optimizationParams.nodeCount = 501; %Count must be odd for Simpson
+optimizationParams.nodeCount = 301; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
 optimizationParams.glideSlopeEnabled = true;
 optimizationParams.pointingEnabled = true;
@@ -96,7 +96,7 @@ parfor (idx = 1:caseCount)
         PDI.latInitDeg = PDINom.latInitDeg + dlat;
         PDI.inertialVelocity = PDINom.inertialVelocity + dv;
         PDI.flightPathAngleDeg = PDINom.flightPathAngleDeg + dfpa;
-        PDI.azimuth = PDINom.azimuth + dazmth*pi/180;
+        PDI.azimuth = PDINom.azimuth + dazmth;
 
         vehicle = vehicleNom;
         vehicle.massInit = vehicleNom.massInit * (1+ mass_mult);
@@ -130,8 +130,8 @@ elapsed = toc(dispTime)
 done();
 
 %% Save Results
-if ~exist('Dispersion','dir')
-    mkdir('Dispersion');
+if ~exist('Dispersion301','dir')
+    mkdir('Dispersion301');
 end
 
 % Timestamp for the run
@@ -153,7 +153,7 @@ betaVal = beta * 100;
 suffix  = sprintf('%dbeta_%s_%s', round(betaVal), condTag, timeRun);
 
 runName = suffix;
-runDir  = fullfile('Dispersion', runName);
+runDir  = fullfile('Dispersion301', runName);
 mkdir(runDir);
 
 % Filenames
@@ -262,6 +262,8 @@ SuccessTable = table( ...
 disp('Exit flag summary:'); disp(ExitFlagTable);
 disp('Success summary:');   disp(SuccessTable);
 
+%% Rerun section
+%rerunDispersionCase(maxidx, PDINom, planetaryParams, targetState, vehicleNom, optimizationParams, beta, seeds)
 %% Save both tables
 exitCsv   = fullfile(runDir, 'exitflag_summary.csv');
 succCsv   = fullfile(runDir, 'success_summary.csv');

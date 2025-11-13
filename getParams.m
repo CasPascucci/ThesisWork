@@ -65,7 +65,7 @@ lonInitDeg         = PDIState.lonInitDeg;
 latInitDeg         = PDIState.latInitDeg;
 inertialVelocity   = PDIState.inertialVelocity;
 flightPathAngleDeg = PDIState.flightPathAngleDeg;
-azimuth            = PDIState.azimuth * pi / 180;
+azimuth            = PDIState.azimuth * pi / 180; % conver to rad for processing
 
 % Target State Breakout:
 landingLonDeg      = targetState.landingLonDeg;

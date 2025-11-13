@@ -43,8 +43,13 @@ end
 % Calculate and plot the final position dispersion
 finalPositions = [Results.final_error]';
 figure('Name','Final Position Dispersion');
-plot3(finalPositions(:,1),finalPositions(:,2),finalPositions(:,3),'x');
+h = plot3(finalPositions(:,1),finalPositions(:,2),finalPositions(:,3),'x');
+hold on;
 xlabel('East Position'); ylabel('North Position'); zlabel('Up Position');
 title('Final Position Dispersion for Converged Cases');
+idx = [Results.k]';
+h.UserData = idx;
+dataTip = h.DataTipTemplate;
+dataTip.DataTipRows(end+1) = dataTipTextRow('Index', idx);
 grid on;
 end
