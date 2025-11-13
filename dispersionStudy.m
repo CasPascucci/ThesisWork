@@ -2,12 +2,12 @@ clear all; clc; close all;
 % All values are dimensional values
 % Currently does stats off of Optimization values
 PDINom = struct;
-PDINom.altitude_km        = 15.24;
+PDINom.altitude        = 15240;
 PDINom.lonInitDeg         = 41.85;
 PDINom.latInitDeg         = -71.59;
 PDINom.inertialVelocity   = 1693.8;
 PDINom.flightPathAngleDeg = 0;
-PDINom.azimuth            = pi;
+PDINom.azimuth            = 180;
 
 planetaryParams = struct;
 planetaryParams.rPlanet = 1736.01428 * 1000; % m
@@ -31,7 +31,7 @@ targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
 targetState.delta_t   = 5; % seconds dim, for btt
 
 optimizationParams = struct;
-optimizationParams.nodeCount = 501; %Count must be odd for Simpson
+optimizationParams.nodeCount = 301; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
 optimizationParams.glideSlopeEnabled = true;
 optimizationParams.pointingEnabled = true;
@@ -80,10 +80,6 @@ Results = struct('k',{},'gamma',{},'kr',{},'tgo',{},'fuel_opt',{},'fuel_sim',{},
 L_ref = 10000; A_ref = planetaryParams.gPlanet; T_ref = sqrt(L_ref/A_ref); V_ref = L_ref/T_ref; M_ref = 15103.0;
 dispTime = tic;
 %% Stats Loop - Requires Parallel Copmuting Toolbox
-p = gcp('nocreate');
-if isempty(p)
-    parpool(6);
-end
 parfor (idx = 1:caseCount)
     try
         dalt = seeds.alt_seeds(idx) * (r_disp / 3);
@@ -95,12 +91,12 @@ parfor (idx = 1:caseCount)
         mass_mult = seeds.mass_seeds(idx) * (mass_disp / 3);
 
         PDI = PDINom;
-        PDI.altitude_km = PDINom.altitude_km + dalt/1000;
+        PDI.altitude_km = PDINom.altitude / 1000 + dalt/1000;
         PDI.lonInitDeg = PDINom.lonInitDeg + dlon;
         PDI.latInitDeg = PDINom.latInitDeg + dlat;
         PDI.inertialVelocity = PDINom.inertialVelocity + dv;
         PDI.flightPathAngleDeg = PDINom.flightPathAngleDeg + dfpa;
-        PDI.azimuth = PDINom.azimuth + dazmth*pi/180;
+        PDI.azimuth = PDINom.azimuth + dazmth;
 
         vehicle = vehicleNom;
         vehicle.massInit = vehicleNom.massInit * (1+ mass_mult);
@@ -134,8 +130,8 @@ elapsed = toc(dispTime)
 done();
 
 %% Save Results
-if ~exist('Dispersion','dir')
-    mkdir('Dispersion');
+if ~exist('Dispersion301','dir')
+    mkdir('Dispersion301');
 end
 
 % Timestamp for the run
@@ -157,7 +153,7 @@ betaVal = beta * 100;
 suffix  = sprintf('%dbeta_%s_%s', round(betaVal), condTag, timeRun);
 
 runName = suffix;
-runDir  = fullfile('Dispersion', runName);
+runDir  = fullfile('Dispersion301', runName);
 mkdir(runDir);
 
 % Filenames
@@ -266,6 +262,8 @@ SuccessTable = table( ...
 disp('Exit flag summary:'); disp(ExitFlagTable);
 disp('Success summary:');   disp(SuccessTable);
 
+%% Rerun section
+%rerunDispersionCase(maxidx, PDINom, planetaryParams, targetState, vehicleNom, optimizationParams, beta, seeds)
 %% Save both tables
 exitCsv   = fullfile(runDir, 'exitflag_summary.csv');
 succCsv   = fullfile(runDir, 'success_summary.csv');

@@ -1,5 +1,0 @@
-ExitFlag,Count,Percent,Meaning
--2,190,6.33333333333333,"Infeasible / no feasible point"
-0,146,4.86666666666667,"Stopped by limit"
-1,7,0.233333333333333,"Optimality and Constraint tolerances met"
-2,2657,88.5666666666667,"Under StepTolerance, Constraint tolerance met"
