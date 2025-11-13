@@ -32,7 +32,7 @@ targetState.afLanding = [0;0;2*planetaryParams.gPlanet]; % m/s^2
 targetState.delta_t   = 5; % seconds dim, for btt, not implemented
 
 optimizationParams = struct;
-optimizationParams.nodeCount = 997; %Count must be odd for Simpson
+optimizationParams.nodeCount = 501; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
 optimizationParams.glideSlopeEnabled = true;
 optimizationParams.pointingEnabled = false;
@@ -42,8 +42,9 @@ optimizationParams.minPointing = 10; %deg, floor for pointing constraint
 beta = 0.85;
 doPlotting = true; % disable this to not plot results
 verboseOutput = true;
-
+tic
 [gammaOpt, krOpt, tgoOpt,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput);
+toc
 % tgoOpt returned in seconds
 gammaOpt
 krOpt

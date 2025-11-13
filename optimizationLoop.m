@@ -197,7 +197,6 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
         end
         c = [c; cGlide];
     end
-    
 
     if pointingFlag 
         aTTOPO = MCMF2ENU(aT,problemParams.landingLatDeg,problemParams.landingLonDeg,false,false);

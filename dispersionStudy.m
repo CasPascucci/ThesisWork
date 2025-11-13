@@ -2,7 +2,7 @@ clear all; clc; close all;
 % All values are dimensional values
 % Currently does stats off of Optimization values
 PDINom = struct;
-PDINom.altitude        = 13360;
+PDINom.altitude        = 15240;
 PDINom.lonInitDeg         = 41.85;
 PDINom.latInitDeg         = -71.59;
 PDINom.inertialVelocity   = 1693.8;
@@ -31,10 +31,10 @@ targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
 targetState.delta_t   = 5; % seconds dim, for btt
 
 optimizationParams = struct;
-optimizationParams.nodeCount = 997; %Count must be odd for Simpson
+optimizationParams.nodeCount = 501; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
-optimizationParams.glideSlopeEnabled = false;
-optimizationParams.pointingEnabled = false;
+optimizationParams.glideSlopeEnabled = true;
+optimizationParams.pointingEnabled = true;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.maxTiltRate = 5; %deg/s
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
