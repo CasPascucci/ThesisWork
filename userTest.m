@@ -32,10 +32,10 @@ targetState.afLanding = [0;0;2*planetaryParams.gPlanet]; % m/s^2
 targetState.delta_t   = 5; % seconds dim, for btt, not implemented
 
 optimizationParams = struct;
-optimizationParams.nodeCount = 501; %Count must be odd for Simpson
+optimizationParams.nodeCount = 301; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
-optimizationParams.glideSlopeEnabled = true;
-optimizationParams.pointingEnabled = true;
+optimizationParams.glideSlopeEnabled = false;
+optimizationParams.pointingEnabled = false;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
 
