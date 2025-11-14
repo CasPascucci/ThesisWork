@@ -2,12 +2,12 @@ clear all; clc; close all;
 % All values are dimensional values
 % Currently does stats off of Optimization values
 PDINom = struct;
-PDINom.altitude_km        = 13.36;
+PDINom.altitude        = 15240;
 PDINom.lonInitDeg         = 41.85;
 PDINom.latInitDeg         = -71.59;
 PDINom.inertialVelocity   = 1693.8;
 PDINom.flightPathAngleDeg = 0;
-PDINom.azimuth            = pi;
+PDINom.azimuth            = 180;
 
 planetaryParams = struct;
 planetaryParams.rPlanet = 1736.01428 * 1000; % m
@@ -31,10 +31,10 @@ targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
 targetState.delta_t   = 5; % seconds dim, for btt
 
 optimizationParams = struct;
-optimizationParams.nodeCount = 997; %Count must be odd for Simpson
+optimizationParams.nodeCount = 301; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
-optimizationParams.glideSlopeEnabled = false;
-optimizationParams.pointingEnabled = false;
+optimizationParams.glideSlopeEnabled = true;
+optimizationParams.pointingEnabled = true;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.maxTiltRate = 5; %deg/s
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
@@ -91,12 +91,12 @@ parfor (idx = 1:caseCount)
         mass_mult = seeds.mass_seeds(idx) * (mass_disp / 3);
 
         PDI = PDINom;
-        PDI.altitude_km = PDINom.altitude_km + dalt/1000;
+        PDI.altitude_km = PDINom.altitude / 1000 + dalt/1000;
         PDI.lonInitDeg = PDINom.lonInitDeg + dlon;
         PDI.latInitDeg = PDINom.latInitDeg + dlat;
         PDI.inertialVelocity = PDINom.inertialVelocity + dv;
         PDI.flightPathAngleDeg = PDINom.flightPathAngleDeg + dfpa;
-        PDI.azimuth = PDINom.azimuth + dazmth*pi/180;
+        PDI.azimuth = PDINom.azimuth + dazmth;
 
         vehicle = vehicleNom;
         vehicle.massInit = vehicleNom.massInit * (1+ mass_mult);
@@ -130,8 +130,8 @@ elapsed = toc(dispTime)
 done();
 
 %% Save Results
-if ~exist('Dispersion','dir')
-    mkdir('Dispersion');
+if ~exist('Dispersion301','dir')
+    mkdir('Dispersion301');
 end
 
 % Timestamp for the run
@@ -153,7 +153,7 @@ betaVal = beta * 100;
 suffix  = sprintf('%dbeta_%s_%s', round(betaVal), condTag, timeRun);
 
 runName = suffix;
-runDir  = fullfile('Dispersion', runName);
+runDir  = fullfile('Dispersion301', runName);
 mkdir(runDir);
 
 % Filenames
@@ -210,8 +210,7 @@ SummaryTable = table(names, meanVals, stdVals, minVals, maxVals, lowVals, highVa
     'VariableNames', {'Parameter','Mean','StdDev','Min','Max','-3σ','+3σ'});
 
 disp(SummaryTable);
-summaryFile = fullfile(runDir, 'results_dispersion_summary.csv');
-writetable(SummaryTable, summaryFile);
+
 
 % Exit Flag/Conditions Summary
 allExit = [Results.exitflag]';
@@ -257,18 +256,23 @@ SuccessTable = table( ...
     [succPct;   failPct], ...
     'VariableNames', {'Outcome','Count','Percent'});
 
-% Save both tables
-exitCsv   = fullfile(runDir, 'exitflag_summary.csv');
-succCsv   = fullfile(runDir, 'success_summary.csv');
-writetable(ExitFlagTable, exitCsv);
-writetable(SuccessTable,  succCsv);
+
 
 % Table figures
 disp('Exit flag summary:'); disp(ExitFlagTable);
 disp('Success summary:');   disp(SuccessTable);
 
+%% Rerun section
+%rerunDispersionCase(maxidx, PDINom, planetaryParams, targetState, vehicleNom, optimizationParams, beta, seeds)
+%% Save both tables
+exitCsv   = fullfile(runDir, 'exitflag_summary.csv');
+succCsv   = fullfile(runDir, 'success_summary.csv');
+writetable(ExitFlagTable, exitCsv);
+writetable(SuccessTable,  succCsv);
+summaryFile = fullfile(runDir, 'results_dispersion_summary.csv');
+writetable(SummaryTable, summaryFile);
 
-% Progress Bar Function
+%% Progress Bar Function
 function [queue, done] = waitBarQueue(caseCount, titleStr)
     queue = parallel.pool.DataQueue;
     p = 0;

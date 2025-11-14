@@ -1,3 +1,0 @@
-ExitFlag,Count,Percent,Meaning
-1,2999,99.9666666666667,"Optimality and Constraint tolerances met"
-2,1,0.0333333333333333,"Under StepTolerance, Constraint tolerance met"

@@ -22,7 +22,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     bineq = [-1e-6; -4-1e-4; -0.01];
 
     lb = [1e-6, 0, 0.01];
-    ub = [8, 30, 11];
+    ub = [10, 50, 15];
 
     if dispersion
         fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
@@ -68,6 +68,12 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
 
     gamma1 = optParams(1);
     gamma2 = optParams(2)/(optParams(1)+2) - 2;
+    if gamma1 < 0
+        gamma1 = 0;
+    end
+    if gamma2 < 0
+        gamma2 = 0;
+    end
 
     [c1, c2] = calculateCoeffs(r0, v0, optParams(3), gamma1, gamma2, afStar, rfStar, vfStar, gConst);
 
@@ -102,6 +108,12 @@ function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, 
 
     gamma1 = gamma;
     gamma2 = kr/(gamma+2) - 2;
+    if gamma1 < 0
+        gamma1 = 0;
+    end
+    if gamma2 < 0
+        gamma2 = 0;
+    end
 
     
     [c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, afStar, rfStar, vfStar, gConst);
@@ -156,7 +168,7 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     c = [upper(:); lower(:)];
     ceq = [];
     if glideSlopeFlag
-        glideNodes = floor(nodeCount*0.20);
+        glideNodes = floor(nodeCount*0.15);
         freeGlideNodes = floor(nodeCount*0.02) + 1;
         tgospanGlide = tgospan(1:glideNodes);
         phi1hat = (tgospanGlide.^(gamma1+2))./((gamma1+1)*(gamma1+2));
@@ -185,7 +197,6 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
         end
         c = [c; cGlide];
     end
-    
 
     if pointingFlag 
         aTTOPO = MCMF2ENU(aT,problemParams.landingLatDeg,problemParams.landingLonDeg,false,false);
