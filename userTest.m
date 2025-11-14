@@ -40,6 +40,7 @@ optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
 optimizationParams.updateFreq = 10;
 optimizationParams.updateStop = 30;
+optimizationParams.updateOpt = true;
 
 beta = 0.85;
 doPlotting = true; % disable this to not plot results

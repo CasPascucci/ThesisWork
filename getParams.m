@@ -172,6 +172,7 @@ nonDimParams.minThrustND = minThrustND;
 
 %% Optimization
 paramsX0 = [1, 6.5, 6];
+reopt = optimizationParams.updateOpt;
 
 [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
 gammaOpt = optParams(1);
@@ -198,7 +199,6 @@ if ~dispersion
 end
 % Plotting Handling
     if nargout > 5 || doPlots
-        reopt = true;
         if ~ reopt
             [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = closedLoopSim(gammaOpt, krOpt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
         else
