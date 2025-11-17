@@ -46,12 +46,12 @@ beta = 0.69;
 doPlotting = true; % disable this to not plot results
 verboseOutput = true;
 tic
-[gammaOpt, krOpt, tgoOptSec,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput);
+[gammaOpt, gamma2Opt, krOpt, tgoOptSec,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput);
 toc
 % tgoOpt returned in seconds
 gammaOpt
 krOpt
 tgoOptSec
-gamma2Opt = krOpt/(gammaOpt+2) - 2
+gamma2Opt
 optFuelCost
 simFuelCost

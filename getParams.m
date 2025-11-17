@@ -1,4 +1,4 @@
-function [gammaOpt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion)
+function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion)
     addpath([pwd, '/CoordinateFunctions']);
 %% Main Function to Run for FP2PDG Optimization Single or Stat
 % Inputs: All given in dimensional values unless stated otherwise
@@ -171,15 +171,15 @@ nonDimParams.maxThrustND = maxThrustND;
 nonDimParams.minThrustND = minThrustND;
 
 %% Optimization
-paramsX0 = [1, 6.5, 6];
+paramsX0 = [0.3, 0.4, 6];
 reopt = optimizationParams.updateOpt;
 
 [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
 gammaOpt = optParams(1);
-krOpt = optParams(2);
+gamma2Opt = optParams(2);
 tgoOpt = optParams(3) * T_ref;
 optFuelCost = (mOptim(end)-mOptim(1))*M_ref;
-
+%% GAMMA1GAMMA2 DONE TIL HERE
 % Run Unconstrained Opt and Sim for Plotting
 if ~dispersion
     fprintf("-----------------------------------------------\n");
