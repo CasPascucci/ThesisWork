@@ -34,24 +34,24 @@ targetState.delta_t   = 5; % seconds dim, for btt, not implemented
 optimizationParams = struct;
 optimizationParams.nodeCount = 301; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
-optimizationParams.glideSlopeEnabled = false;
+optimizationParams.glideSlopeEnabled = true;
 optimizationParams.pointingEnabled = false;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
 optimizationParams.updateFreq = 10;
-optimizationParams.updateStop = 30;
-optimizationParams.updateOpt = true;
+optimizationParams.updateStop = 140;
+optimizationParams.updateOpt = false;
 
-beta = 0.85;
+beta = 0.69;
 doPlotting = true; % disable this to not plot results
 verboseOutput = true;
 tic
-[gammaOpt, krOpt, tgoOpt,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput);
+[gammaOpt, krOpt, tgoOptSec,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput);
 toc
 % tgoOpt returned in seconds
 gammaOpt
 krOpt
-tgoOpt
+tgoOptSec
 gamma2Opt = krOpt/(gammaOpt+2) - 2
 optFuelCost
 simFuelCost

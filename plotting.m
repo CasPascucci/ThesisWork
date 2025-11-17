@@ -89,7 +89,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     rdOptimTOPO = MCMF2ENU(rdOptim',problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
     rdOptimTOPODim = rdOptimTOPO*L_ref;
 
-    tgospanOpt = linspace(0,tTraj(end),nodeCount);
+    tgospanOpt = linspace(0,tgo0,nodeCount);
     tspanOpt = tgo0 - tgospanOpt;
     aTNormOpt = vecnorm(aTOptim,2,2);
 % Optim Throttle
@@ -153,7 +153,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
 % Optim 3D Plot
     Ntotal = size(rdOptimTOPODim, 2);% total node count
-    idx_hi = floor(0.20 * Ntotal); % match the high index from constraints
+    idx_hi = floor(0.15 * Ntotal); % match the high index from constraints
     idx_lo = floor(0.02 * Ntotal) + 1; % match the low index from constraints
     idx = idx_lo:idx_hi; % range
     
@@ -192,7 +192,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     UPlat = UPlat * ones(size(azPlat));
     
     figure('Name','Opt 3D'); hold on; grid on; axis equal;
-    plot3(ETraj/1000, NTraj/1000, UTraj/1000, 'b-', 'LineWidth', 2);
+    plot3(ETraj/1000, NTraj/1000, UTraj/1000, 'b.', 'LineWidth', 2, 'MarkerSize',15);
     surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8);
     plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 0.8);
     if ~isempty(rdOptimUC)

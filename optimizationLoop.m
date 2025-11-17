@@ -27,15 +27,15 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     if dispersion
         fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
         'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
-        'Algorithm','interior-point', 'EnableFeasibilityMode',true, ...
+        'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
         'HessianApproximation','lbfgs','HonorBounds',false);
     else
         fminconOptions = optimoptions('fmincon', 'Display', 'final', 'MaxFunctionEvaluations', 10000, ...
         'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
-        'Algorithm','interior-point', 'EnableFeasibilityMode',true, ...
-        'HessianApproximation','lbfgs','HonorBounds',false);
+        'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
+        'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
         if optimizationParams.updateOpt
-            fminconOptions = optimoptions('fmincon', 'Display', 'final', 'MaxFunctionEvaluations', 10000, ...
+            fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
             'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
             'Algorithm','interior-point', 'EnableFeasibilityMode',true, ...
             'HessianApproximation','lbfgs','HonorBounds',false);
@@ -61,7 +61,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
         fprintf('\nOptimal parameters:\n');
         fprintf('  gamma = %.6f\n', optParams(1));
         fprintf('  kr    = %.6f\n', optParams(2));
-        fprintf('  tgo   = %.6f (s)\n', optParams(3)* refVals.T_ref);
+        fprintf('  tgo   = %.6f (ND)\n', optParams(3));
     
         [c, ~] = nonlincon(optParams);
         activeIneq = find(c >= -1e-6); % Nearly active
@@ -128,6 +128,7 @@ function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, 
     tspan = linspace(0,tgo,nodeCount);
 
     aT = afStar + c1*tspan.^gamma1 + c2*tspan.^gamma2;
+    
     aTmag = vecnorm(aT,2,1);
 
     simpson1 = simpsonComp13Integral(tspan,aTmag);
@@ -176,7 +177,7 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     ceq = [];
     if glideSlopeFlag
         glideNodes = floor(nodeCount*0.15);
-        freeGlideNodes = floor(nodeCount*0.02) + 1;
+        freeGlideNodes = floor(nodeCount*0.01) + 1;
         tgospanGlide = tgospan(1:glideNodes);
         phi1hat = (tgospanGlide.^(gamma1+2))./((gamma1+1)*(gamma1+2));
         phi2hat = (tgospanGlide.^(gamma2+2))./((gamma2+1)*(gamma2+2));
