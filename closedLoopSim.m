@@ -1,6 +1,7 @@
-function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma,kr,tgo0, problemParams, nonDimParams, refVals, delta_t)
+function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma,gamma2,tgo0, problemParams, nonDimParams, refVals, delta_t)
 
-    
+    kr = (gamma2+2)*(gamma+2);
+
     r0 = nonDimParams.r0ND;
     v0 = nonDimParams.v0ND;
     m0 = nonDimParams.m0ND;
