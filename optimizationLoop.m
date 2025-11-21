@@ -16,32 +16,25 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     isp = nonDimParams.ispND;
 
     % Fmincon Constraints
-    Aineq = [-1  0  0;      % -gamma <= -1e-6 ---- gamma >= 1e-6
-              2 -1  0;      % 2gamma - kr <= -4-1e-4 ---- kr >= 2gamma +4+1e-4 ---- kr >= 2*(gamma + 2) + 1e-4
+    Aineq = [-1  0  0;      % -gamma <= 0 ---- gamma >= 0
+              1 -1  0;      %  gamma -gamma2 <= -1e-4 ---- gamma2 >= gamma + 1e-4
               0  0 -1];     % tgo >= 0.01
-    bineq = [-1e-6; -4-1e-4; -0.01];
+    bineq = [0; -1e-4; -0.01];
 
-    lb = [1e-6, 0, 0.01];
-    ub = [10, 50, 15];
+    lb = [0, 0, 0.01];
+    ub = [10, 10, 15];
 
-    if dispersion
-        fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
-        'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
-        'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
-        'HessianApproximation','lbfgs','HonorBounds',false);
-    else
-        fminconOptions = optimoptions('fmincon', 'Display', 'final', 'MaxFunctionEvaluations', 10000, ...
-        'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
-        'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
-        'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
-        if optimizationParams.updateOpt
+        if dispersion || optimizationParams.updateOpt
             fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
-            'FiniteDifferenceType','central','FiniteDifferenceStepSize', 1e-4,'MaxIterations', 1000, ...
-            'Algorithm','interior-point', 'EnableFeasibilityMode',true, ...
-            'HessianApproximation','lbfgs','HonorBounds',false);
+            'FiniteDifferenceType','central','MaxIterations', 1000, ...
+            'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
+            'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
+        else
+            fminconOptions = optimoptions('fmincon', 'Display', 'final', 'MaxFunctionEvaluations', 10000, ...
+            'FiniteDifferenceType','central','MaxIterations', 1000, ...
+            'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
+            'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
         end
-
-    end
 
     nodeCount = optimizationParams.nodeCount;
 
@@ -60,7 +53,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
         fprintf('First-order optimality: %.6e (tolerance: %.1e)\n', output.firstorderopt, fminconOptions.OptimalityTolerance);
         fprintf('\nOptimal parameters:\n');
         fprintf('  gamma = %.6f\n', optParams(1));
-        fprintf('  kr    = %.6f\n', optParams(2));
+        fprintf('  gamma2    = %.6f\n', optParams(2));
         fprintf('  tgo   = %.6f (ND)\n', optParams(3));
     
         [c, ~] = nonlincon(optParams);
@@ -74,7 +67,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
 
 
     gamma1 = optParams(1);
-    gamma2 = optParams(2)/(optParams(1)+2) - 2;
+    gamma2 = optParams(2);
     if gamma1 < 0
         gamma1 = 0;
     end
@@ -85,8 +78,6 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     [c1, c2] = calculateCoeffs(r0, v0, optParams(3), gamma1, gamma2, afStar, rfStar, vfStar, gConst);
 
     tgospan = linspace(0,optParams(3),nodeCount);
-    %tspan = optParams(3) - tgospan;
-
     aTOptim = afStar + c1*tgospan.^gamma1 + c2*tgospan.^gamma2;
 
     phi1hat = (tgospan.^(gamma1+2))./((gamma1+1)*(gamma1+2));
@@ -108,13 +99,11 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
 end
 %% Functions
 function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, v, gConst, nonDimParams, optimizationParams)
-    gamma  = params(1);
-    kr     = params(2);
+    gamma1  = params(1);
+    gamma2     = params(2);
     tgo   = params(3);
     nodeCount = optimizationParams.nodeCount;
 
-    gamma1 = gamma;
-    gamma2 = kr/(gamma+2) - 2;
     if gamma1 < 0
         gamma1 = 0;
     end
@@ -142,15 +131,10 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     nodeCount = optimizationParams.nodeCount;
     glideSlopeFlag = optimizationParams.glideSlopeEnabled;
     pointingFlag = optimizationParams.pointingEnabled;
-    gamma  = params(1);
-    kr     = params(2);
+    gamma1  = params(1);
+    gamma2     = params(2);
     tgo0   = params(3);
     m0 = 1;
-
-    gamma1 = gamma;
-    gamma2 = kr/(gamma+2) - 2;
-
-
 
     [c1, c2] = calculateCoeffs(r0, v0, tgo0, gamma1, gamma2, afStar, rfStar, vfStar, gConst);
     tgospan = linspace(0,tgo0,nodeCount);

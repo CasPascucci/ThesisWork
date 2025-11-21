@@ -40,18 +40,18 @@ optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
 optimizationParams.updateFreq = 10;
 optimizationParams.updateStop = 140;
-optimizationParams.updateOpt = false;
+optimizationParams.updateOpt = true;
 
 beta = 0.7;
 doPlotting = true; % disable this to not plot results
 verboseOutput = true;
 tic
-[gammaOpt, krOpt, tgoOptSec,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput);
+[gammaOpt, gamma2Opt, krOpt, tgoOptSec,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim, optHistory, exitFlags] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput);
 toc
 % tgoOpt returned in seconds
 gammaOpt
 krOpt
 tgoOptSec
-gamma2Opt = krOpt/(gammaOpt+2) - 2
+gamma2Opt
 optFuelCost
 simFuelCost

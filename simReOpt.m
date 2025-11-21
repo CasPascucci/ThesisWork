@@ -1,5 +1,6 @@
-function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, exitFlags] = simReOpt(gamma0,kr0,tgo0, problemParams, nonDimParams, refVals, delta_t, optimizationParams, betaParam, verboseOutput)
+function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, exitFlags] = simReOpt(gamma0,gamma20,tgo0, problemParams, nonDimParams, refVals, delta_t, optimizationParams, betaParam, verboseOutput)
 
+kr0 = (gamma20+2)*(gamma0+2);
 % Original IC's
 r0 = nonDimParams.r0ND;
 v0 = nonDimParams.v0ND;
@@ -20,15 +21,20 @@ updateStopND = optimizationParams.updateStop / refVals.T_ref;
 % Setup Results
 t_elapsed = 0;
 gamma = gamma0;
+gamma2 = gamma20;
 kr = kr0;
 tgo = tgo0;
 
 tTraj = [];
 stateTraj = [];
+ICstates = [];
+ICstates(:,1) = X0;
+ICcounter = 2;
 aTList = [];
 flag_thrustGotLimited = false;
-optHistory = [t_elapsed, gamma, kr, tgo];
+optHistory = [t_elapsed, gamma, gamma2, kr, tgo];
 exitFlags = [];
+exitFlags(1) = [99];
 
 odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
 
@@ -60,7 +66,7 @@ minTime = 0.2/refVals.T_ref;
             fprintf('--- Segment %d ---\n', segmentCount);
             fprintf('Time: %.2f to %.2f s (elapsed)\n', t_start * refVals.T_ref, t_end * refVals.T_ref);
             fprintf('Tgo at start: %.2f s\n', tgo * refVals.T_ref);
-            fprintf('Current params: gamma=%.4f, kr=%.4f\n', gamma, kr);
+            fprintf('Current params: gamma=%.4f, gamma2=%.4f, kr=%.4f\n', gamma, gamma2, kr);
         end
     
         [tSeg, stateSeg] = ode45(@(t, X) trajectorySegmentODE(t, X, t_elapsed, gamma, kr, tgo, ...
@@ -85,6 +91,9 @@ minTime = 0.2/refVals.T_ref;
         aTList = [aTList, segAT];
     
         X0 = stateSeg(end,:)';
+        ICstates(:,ICcounter) = X0;
+        ICcounter = ICcounter + 2;
+
         t_elapsed = tSeg(end);
     
         tgo = tgo - t_segment;
@@ -105,7 +114,7 @@ minTime = 0.2/refVals.T_ref;
         newNonDimParams.v0ND = X0(4:6);
         newNonDimParams.m0ND = X0(7);
         
-        paramsX0 = [gamma, kr, tgo];
+        paramsX0 = [gamma, gamma2, tgo];
         
         if verboseOutput
             fprintf('\nRe-optimizing at t=%.2f s (tgo=%.2f s)...\n', t_elapsed * refVals.T_ref, tgo * refVals.T_ref);
@@ -116,13 +125,14 @@ minTime = 0.2/refVals.T_ref;
 
         if exitflag > 0
             % Check for unreasonable jumps
-            gamma_change = abs(optParams(1) - gamma) / gamma;
-            if gamma_change > 0.3  % More than 30% change
+            gamma_change = abs(optParams(1) - gamma);
+            if gamma_change > 0.5  % More than 30% change
                 fprintf('WARNING: Large gamma jump (%.4f -> %.4f). Rejecting.\n', gamma, optParams(1));
                 % Don't update parameters
             else
                 gamma = optParams(1);
-                kr = optParams(2);
+                gamma2 = optParams(2);
+                kr = (gamma2+2)*(gamma+2);
                 tgo = optParams(3);
             end
         else
@@ -132,12 +142,12 @@ minTime = 0.2/refVals.T_ref;
             end
         end
         
-        optHistory = [optHistory; [t_elapsed, gamma, kr, tgo]];
+        optHistory = [optHistory; [t_elapsed, gamma, gamma2, kr, tgo]];
         exitFlags = [exitFlags; exitflag];
         
         if verboseOutput
-            fprintf('New parameters: gamma=%.4f, kr=%.4f, tgo=%.2f s (exitflag=%d)\n\n', ...
-                gamma, kr, tgo * refVals.T_ref, exitflag);
+            fprintf('New parameters: gamma=%.4f, gamma2=%.4f, kr=%.4f, tgo=%.2f s (exitflag=%d)\n\n', ...
+                gamma, gamma2, kr, tgo * refVals.T_ref, exitflag);
         end
     end
     
