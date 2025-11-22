@@ -1,5 +1,8 @@
 % Plotting function for Single Runs
 function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, unconstrained)
+    % Check if simulation data is available
+    hasSimData = ~isempty(tTraj) && ~isempty(stateTraj) && ~isempty(aTList);
+    
     gamma = optParams(1);
     kr = optParams(2);
     tgo0 = optParams(3);
@@ -12,38 +15,41 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     [E0, N0, U0] = enuBasis(deg2rad(problemParams.landingLatDeg),deg2rad(problemParams.landingLonDeg));
     isp = nonDimParams.ispND;
 
-    rState = stateTraj(:,1:3);
-    rDim = rState * L_ref;
-    vState = stateTraj(:,4:6);
-    vDim = vState * V_ref;
-    mState = stateTraj(:,7);
-    mDim = mState * M_ref;
-    tgoState = tgo0 - tTraj;
-    tgoDim = tgoState * T_ref;
-    tgo0Dim = tgoDim(1);
+    % Process simulation data if available
+    if hasSimData
+        rState = stateTraj(:,1:3);
+        rDim = rState * L_ref;
+        vState = stateTraj(:,4:6);
+        vDim = vState * V_ref;
+        mState = stateTraj(:,7);
+        mDim = mState * M_ref;
+        tgoState = tgo0 - tTraj;
+        tgoDim = tgoState * T_ref;
+        tgo0Dim = tgoDim(1);
 
-    aTDim = aTList * A_ref;
-    aTDimNorm = vecnorm(aTDim,2,1);
+        aTDim = aTList * A_ref;
+        aTDimNorm = vecnorm(aTDim,2,1);
 
-    %rLanding = rMoon*U0;
-    deltaR = MCMF2ENU(rDim',problemParams.landingLatDeg,problemParams.landingLonDeg,true,true);
-    East  = deltaR(1,:)';
-    North = deltaR(2,:)';
-    Up    = deltaR(3,:)';
+        %rLanding = rMoon*U0;
+        deltaR = MCMF2ENU(rDim',problemParams.landingLatDeg,problemParams.landingLonDeg,true,true);
+        East  = deltaR(1,:)';
+        North = deltaR(2,:)';
+        Up    = deltaR(3,:)';
 
-    alt_m = vecnorm(rDim,2,2) - rMoon;
+        alt_m = vecnorm(rDim,2,2) - rMoon;
 
-    vDimENU = MCMF2ENU(vDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
-    vE = vDimENU(1,:)';
-    vN = vDimENU(2,:)';
-    vU = vDimENU(3,:)';
+        vDimENU = MCMF2ENU(vDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
+        vE = vDimENU(1,:)';
+        vN = vDimENU(2,:)';
+        vU = vDimENU(3,:)';
 
-    aTDimENU = MCMF2ENU(aTDim,problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
-    aE = aTDimENU(1,:)';
-    aN = aTDimENU(2,:)';
-    aU = aTDimENU(3,:)';
-    aT_ENU = [aE, aN, aU];
-    aT_norm_ENU = vecnorm(aT_ENU,2,2);
+        aTDimENU = MCMF2ENU(aTDim,problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
+        aE = aTDimENU(1,:)';
+        aN = aTDimENU(2,:)';
+        aU = aTDimENU(3,:)';
+        aT_ENU = [aE, aN, aU];
+        aT_norm_ENU = vecnorm(aT_ENU,2,2);
+    end
     
     
     hasUC = exist('unconstrained','var') && ~isempty(unconstrained);
@@ -92,6 +98,10 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     tgospanOpt = linspace(0,tgo0,nodeCount);
     tspanOpt = tgo0 - tgospanOpt;
     aTNormOpt = vecnorm(aTOptim,2,2);
+
+    EOpt = rdOptimTOPODim(1, :);
+    NOpt = rdOptimTOPODim(2, :);
+    UOpt = rdOptimTOPODim(3, :);
 % Optim Throttle
     figure('Name',"Optim Throttle"); hold on;
     thrustDim = aTNormOpt .* mOptim *(refVals.M_ref*refVals.A_ref);
@@ -119,7 +129,9 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     end
     yline(problemParams.minThrustDim/problemParams.maxThrustDim, 'r--', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
     xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle');
-    subtitle(sprintf("Optim - gamma: %.2f, kr: %.2f, tgo: %.2f s\n UC - gamma: %.2f, kr: %.2f, tgo: %.2f s", optParams(1),optParams(2),optParams(3)*T_ref,unconstrained.optParams(1),unconstrained.optParams(2),unconstrained.optParams(3)*T_ref));
+    if hasUC
+        subtitle(sprintf("Optim - gamma: %.2f, kr: %.2f, tgo: %.2f s\n UC - gamma: %.2f, kr: %.2f, tgo: %.2f s", optParams(1),optParams(2),optParams(3)*T_ref,unconstrained.optParams(1),unconstrained.optParams(2),unconstrained.optParams(3)*T_ref));
+    end
     optFuelCost = (mOptim(end)-mOptim(1))*M_ref;
     subtitle(sprintf("Consumed Fuel: %.2f kg", optFuelCost));
     legend('Location','best');
@@ -148,7 +160,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     grid on;
     altMax = 1.5 * max(max(alt_opt),max(alt_optUC)) / 1000;
     ylim([0,altMax]);
-    subtitle(sprintf("East Error: %.2f m\n North Error: %.2f\n Up Error: %.2f", East(end), North(end), Up(end)));
+    subtitle(sprintf("East Error: %.2f m\n North Error: %.2f\n Up Error: %.2f", EOpt(1), NOpt(1), UOpt(1)));
     legend();
 
 % Optim 3D Plot
@@ -157,9 +169,9 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     idx_lo = floor(0.02 * Ntotal) + 1; % match the low index from constraints
     idx = idx_lo:idx_hi; % range
     
-    EOpt = rdOptimTOPODim(1, 1:idx_hi);
-    NOpt = rdOptimTOPODim(2, 1:idx_hi);
-    UOpt = rdOptimTOPODim(3, 1:idx_hi);
+    EOpt = EOpt(1:idx_hi);
+    NOpt = NOpt(1:idx_hi);
+    UOpt = UOpt(1:idx_hi);
     
     ETraj = rdOptimTOPODim(1, 1:idx_hi);
     NTraj = rdOptimTOPODim(2, 1:idx_hi);
@@ -192,7 +204,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     UPlat = UPlat * ones(size(azPlat));
     
     figure('Name','Opt 3D'); hold on; grid on; axis equal;
-    plot3(ETraj/1000, NTraj/1000, UTraj/1000, 'b.', 'LineWidth', 2, 'MarkerSize',15);
+    plot3(ETraj/1000, NTraj/1000, UTraj/1000, 'b-', 'LineWidth', 2, 'MarkerSize',15);
     surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8);
     plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 0.8);
     if ~isempty(rdOptimUC)
@@ -207,7 +219,9 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     ylabel('North (km)');
     zlabel('Up (km)');
     title('3D Trajectory with Cosine-Based Glide-Slope Envelope (2%–20% nodes)');
-    subtitle(sprintf("Constrained - gamma: %.2f, kr: %.2f, tgo: %.2f \n Thrust Only - gamma: %.2f, kr: %.2f, tgo: %.2f s", optParams(1),optParams(2),optParams(3)*T_ref,unconstrained.optParams(1),unconstrained.optParams(2),unconstrained.optParams(3)*T_ref));
+    if hasUC
+        subtitle(sprintf("Constrained - gamma: %.2f, kr: %.2f, tgo: %.2f \n Thrust Only - gamma: %.2f, kr: %.2f, tgo: %.2f s", optParams(1),optParams(2),optParams(3)*T_ref,unconstrained.optParams(1),unconstrained.optParams(2),unconstrained.optParams(3)*T_ref));
+    end
     view(80, 15); camproj orthographic;
     zlim([0,2]);
     xlim([-3,3]);
@@ -261,7 +275,9 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     grid on;
     
 %% Sim Figures
-% Figure 1: 3D trajectory with glideslope Cone
+if hasSimData
+    % Only generate simulation figures if simulation data is available
+    % Figure 1: 3D trajectory with glideslope Cone
     idx2km = find(alt_m <= 2000, 1, 'first');
     if isempty(idx2km)
         % Fallback: if never reaches 2 km, just use the last 20%
@@ -483,4 +499,11 @@ plot(tTraj*T_ref, ThetaSim - phiSim, 'b-', 'LineWidth', 1.6, 'DisplayName','Marg
 xlabel('Time s'); ylabel('deg');
 title('Pointing margin (positive means within limit)');
 legend('Location','best');
+
+else
+    % Simulation data not available - only optimization plots were generated
+    fprintf('\n=== NOTE: Simulation plots skipped (runSimulation = false) ===\n');
+    fprintf('Only optimization-based plots have been generated.\n\n');
+end
+
 end

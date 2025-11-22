@@ -242,7 +242,7 @@ end
 
 %If doing Plots
 if needsPlotting
-    newplotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained);
+    plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained);
 end
 
 % % Run Unconstrained Opt and Sim for Plotting
