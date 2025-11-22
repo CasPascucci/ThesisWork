@@ -1,4 +1,6 @@
-function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, exitFlags] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion)
+function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, exitFlags] = ...
+    getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation)
+
     addpath([pwd, '/CoordinateFunctions']);
 %% Main Function to Run for FP2PDG Optimization Single or Stat
 % Inputs: All given in dimensional values unless stated otherwise
@@ -55,8 +57,11 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
 %   fuelCost: Estimated fuel cost from simulation of flight
 if nargin < 9
     dispersion = false;
+    runSimulation = true;
 end
-    
+if nargin < 10
+    runSimulation = true;
+end
 
 
 % PDI Breakout:
@@ -174,47 +179,109 @@ nonDimParams.minThrustND = minThrustND;
 paramsX0 = [0.3, 0.4, 6];
 reopt = optimizationParams.updateOpt;
 
-[optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
+[optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
+    optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
+
 gammaOpt = optParams(1);
 gamma2Opt = optParams(2);
 krOpt = (gamma2Opt+2)*(gammaOpt+2);
 tgoOpt = optParams(3) * T_ref;
 optFuelCost = (mOptim(end)-mOptim(1))*M_ref;
-%% GAMMA1GAMMA2 DONE TIL HERE
-% Run Unconstrained Opt and Sim for Plotting
-if ~dispersion
+
+%Determine what needs to be run
+needsUnConOpt = doPlots && ~dispersion;
+needsSim = runSimulation;
+needsPlotting = doPlots;
+
+
+unconstrained = struct();
+if needsUnConOpt % If plotting, sho unconstrained for comparison
     fprintf("-----------------------------------------------\n");
-    fprintf("Unconstrained OPT for Plotting");
+    fprintf("Unconstrained OPT for Plotting\n");
     optimizationParamsUC = optimizationParams;
     optimizationParamsUC.glideSlopeEnabled = false;
     optimizationParamsUC.pointingEnabled = false;
-    [optParamsUC,optCostUC, aTOptimUC, mOptimUC, rdOptimUC, vdOptimUC] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParamsUC, refVals, delta_tND, false);
+    [optParamsUC, optCostUC, aTOptimUC, mOptimUC, rdOptimUC, vdOptimUC] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParamsUC, refVals, delta_tND, false, false);
     ucOptFuelCost = (mOptimUC(end)-mOptimUC(1))*M_ref;
     gammaOptUC = optParamsUC(1);
     gamma2OptUC = optParamsUC(2);
     tgoOptUC = optParamsUC(3) * T_ref;
     [tTrajUC, stateTrajUC, aTListUC, flag_thrustGotLimitedUC] = closedLoopSim(gammaOptUC, gamma2OptUC, tgoOptUC/T_ref, problemParams, nonDimParams, refVals, delta_tND);
     ucSimFuelCost = M_ref*(stateTrajUC(1,7) - stateTrajUC(end,7));
-    unconstrained = struct('tTraj',tTrajUC,'stateTraj',stateTrajUC,'optParams',optParamsUC,'optCost',optCostUC,'aTOptim',aTOptimUC,'mOptim',mOptimUC,'rdOptim',rdOptimUC,'vdOptim',vdOptimUC,'aTList',aTListUC,'flag_thrustGotLimited',flag_thrustGotLimitedUC);
-    fprintf("-----------------------------------------------");
+    unconstrained = struct('tTraj', tTrajUC, 'stateTraj', stateTrajUC, 'optParams', optParamsUC, ...
+                          'optCost', optCostUC, 'aTOptim', aTOptimUC, 'mOptim', mOptimUC, ...
+                          'rdOptim', rdOptimUC, 'vdOptim', vdOptimUC, 'aTList', aTListUC, ...
+                          'flag_thrustGotLimited', flag_thrustGotLimitedUC);
+    fprintf("-----------------------------------------------\n");
 end
-% Plotting Handling
-    if nargout > 5 || doPlots
-        if ~ reopt
-            [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
-        else
-            [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, exitFlags] = simReOpt(gammaOpt,gamma2Opt,tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
-        end
-        if ~exist("optHistory","var")
-            optHistory = [];
-        end
-        if ~exist("exitFlags","var")
-            exitFlags = [];
-        end
-        simFuelCost = M_ref*(stateTraj(1,7) - stateTraj(end,7));
-        finalPosSim = MCMF2ENU(stateTraj(end,1:3)'*L_ref,landingLatDeg,landingLonDeg,true,true);
-        if doPlots
-            plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained);
+
+% If doing simulation:
+tTraj = [];
+stateTraj = [];
+aTSim = [];
+flag_thrustGotLimited = false;
+simFuelCost = [];
+finalPosSim = [];
+optHistory = [];
+exitFlags = [];
+
+if needsSim
+    if ~reopt
+        [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
+    else
+        [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, exitFlags] = simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
+        % Format optHistory as table
+        if ~isempty(optHistory)
+            optHistory = array2table(optHistory);
+            optHistory.Properties.VariableNames(1:5) = {'t_elapsedND','gamma1','gamma2','kr','tgoND'};
         end
     end
+    simFuelCost = M_ref * (stateTraj(1,7) - stateTraj(end,7));
+    finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, true);
+end
+
+%If doing Plots
+if needsPlotting
+    newplotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained);
+end
+
+% % Run Unconstrained Opt and Sim for Plotting
+% if ~dispersion
+%     fprintf("-----------------------------------------------\n");
+%     fprintf("Unconstrained OPT for Plotting");
+%     optimizationParamsUC = optimizationParams;
+%     optimizationParamsUC.glideSlopeEnabled = false;
+%     optimizationParamsUC.pointingEnabled = false;
+%     [optParamsUC,optCostUC, aTOptimUC, mOptimUC, rdOptimUC, vdOptimUC] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParamsUC, refVals, delta_tND, false);
+%     ucOptFuelCost = (mOptimUC(end)-mOptimUC(1))*M_ref;
+%     gammaOptUC = optParamsUC(1);
+%     gamma2OptUC = optParamsUC(2);
+%     tgoOptUC = optParamsUC(3) * T_ref;
+%     [tTrajUC, stateTrajUC, aTListUC, flag_thrustGotLimitedUC] = closedLoopSim(gammaOptUC, gamma2OptUC, tgoOptUC/T_ref, problemParams, nonDimParams, refVals, delta_tND);
+%     ucSimFuelCost = M_ref*(stateTrajUC(1,7) - stateTrajUC(end,7));
+%     unconstrained = struct('tTraj',tTrajUC,'stateTraj',stateTrajUC,'optParams',optParamsUC,'optCost',optCostUC,'aTOptim',aTOptimUC,'mOptim',mOptimUC,'rdOptim',rdOptimUC,'vdOptim',vdOptimUC,'aTList',aTListUC,'flag_thrustGotLimited',flag_thrustGotLimitedUC);
+%     fprintf("-----------------------------------------------");
+% end
+% % Plotting Handling
+%     if nargout > 5 || doPlots
+%         if ~ reopt
+%             [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
+%         else
+%             [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, exitFlags] = simReOpt(gammaOpt,gamma2Opt,tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
+%         end
+%         if ~exist("optHistory","var")
+%             optHistory = [];
+%         else
+%             optHistory = array2table(optHistory);
+%             optHistory.Properties.VariableNames(1:5) = {'t_elapsedND','gamma1','gamma2','kr','tgoND'};
+%         end
+%         if ~exist("exitFlags","var")
+%             exitFlags = [];
+%         end
+%         simFuelCost = M_ref*(stateTraj(1,7) - stateTraj(end,7));
+%         finalPosSim = MCMF2ENU(stateTraj(end,1:3)'*L_ref,landingLatDeg,landingLonDeg,true,true);
+%         if doPlots
+%             plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained);
+%         end
+%     end
 end
