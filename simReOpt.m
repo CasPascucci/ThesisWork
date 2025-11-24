@@ -1,6 +1,9 @@
 function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, exitFlags] = simReOpt(gamma0,gamma20,tgo0, problemParams, nonDimParams, refVals, delta_t, optimizationParams, betaParam, verboseOutput)
 
 kr0 = (gamma20+2)*(gamma0+2);
+
+initialNodeCount = optimizationParams.nodeCount;
+
 % Original IC's
 r0 = nonDimParams.r0ND;
 v0 = nonDimParams.v0ND;
@@ -120,6 +123,29 @@ minTime = 0.2/refVals.T_ref;
             fprintf('\nRe-optimizing at t=%.2f s (tgo=%.2f s)...\n', t_elapsed * refVals.T_ref, tgo * refVals.T_ref);
         end
         
+        % Scale node count proportional to tgo
+        newNodeCount = round(initialNodeCount * (tgo / tgo0));
+
+        % Ensure odd number
+        if mod(newNodeCount, 2) == 0
+            newNodeCount = newNodeCount + 1;
+        end
+
+        % Ensure minimum node count (e.g., 21 to give enough resolution for constraints)
+        if newNodeCount < 21
+            newNodeCount = 21;
+        end
+
+        if newNodeCount > initialNodeCount
+            newNodeCount = initialNodeCount;
+        end
+
+        optimizationParams.nodeCount = newNodeCount;
+
+        if verboseOutput
+            fprintf('Scaled node count to: %d\n', optimizationParams.nodeCount);
+        end
+
         [optParams, ~, ~, ~, ~, ~, exitflag] = optimizationLoop(paramsX0, betaParam, ...
             problemParams, newNonDimParams, optimizationParams, refVals, delta_t, false, false);
 
