@@ -15,6 +15,11 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     minThrust = nonDimParams.minThrustND;
     isp = nonDimParams.ispND;
 
+    [rot_MCMF2ENU, r0_MCMF_ND] = computeMCMF2ENUTransform(...
+        problemParams.landingLatDeg, ...
+        problemParams.landingLonDeg, ...
+        nonDimParams.rMoonND);
+
     % Fmincon Constraints
     Aineq = [-1  0  0;      % -gamma <= 0 ---- gamma >= 0
               1 -1  0;      %  gamma -gamma2 <= -1e-4 ---- gamma2 >= gamma + 1e-4
@@ -26,12 +31,12 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
 
         if dispersion || optimizationParams.updateOpt
             fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
-            'FiniteDifferenceType','central','MaxIterations', 1000, ...
+            'FiniteDifferenceType','forward','MaxIterations', 1000, ...
             'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
             'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
         else
             fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
-            'FiniteDifferenceType','central','MaxIterations', 1000, ...
+            'FiniteDifferenceType','forward','MaxIterations', 1000, ...
             'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
             'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
         end
@@ -39,7 +44,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     nodeCount = optimizationParams.nodeCount;
 
     obj = @(params) objectiveFunction(params, betaParam, afStar, rfStar, r0, vfStar, v0, gConst, nonDimParams, optimizationParams);
-    nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals);
+    nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals, rot_MCMF2ENU, r0_MCMF_ND);
 
     
     [optParams, optCost, exitflag, output] = fmincon(obj, paramsX0, Aineq, bineq, [], [], lb, ub, nonlincon, fminconOptions);
@@ -127,7 +132,7 @@ function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, 
 
 end
 
-function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals)
+function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals, rot_MCMF2ENU, r0_MCMF_ND)
     nodeCount = optimizationParams.nodeCount;
     glideSlopeFlag = optimizationParams.glideSlopeEnabled;
     pointingFlag = optimizationParams.pointingEnabled;
@@ -154,82 +159,99 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
         margin_top = 1.00;
     end
 
-    upper = thrust - (margin_top*maxThrust);
-    lower = minThrust - thrust;
-
-    c = [upper(:); lower(:)];
-    ceq = [];
-
+    nThrustCon = 2 * nodeCount;
+    nGlideCon = 0;
+    nPointCon = 0;
+    
     if glideSlopeFlag
-        glideHigh = optimizationParams.glideSlopeHigh;
-        glideLow = optimizationParams.glideSlopeLow;
-        glideCut = optimizationParams.glideSlopeCutoff;
-        finalTheta = optimizationParams.glideSlopeFinalTheta;
-        cutoffAlt = tand(finalTheta) * glideCut;
-        phi1hat = (tgospan.^(gamma1+2))./((gamma1+1)*(gamma1+2));
-        phi2hat = (tgospan.^(gamma2+2))./((gamma2+1)*(gamma2+2));
-        rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospan + 0.5*(gConst+afStar).*tgospan.^2;
-        rdOptimTOPO = MCMF2ENU(rdOptim,problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
-        rMoon = problemParams.rMoon;
-        rdOptimDim = rdOptim*refVals.L_ref;
-        alt_opt = vecnorm(rdOptimDim,2,1) - rMoon;
-
-        theta = zeros(1,nodeCount);
-
-        mask_high = alt_opt > glideHigh; % Points above the constraint, theta = 90
-        theta(mask_high) = 180;
-
-        mask_mid = (alt_opt <= glideHigh) & (alt_opt >= glideLow);
-        frac = (alt_opt(mask_mid) - glideLow) / (glideHigh-glideLow);
-        theta(mask_mid) = finalTheta + (frac.*(90-finalTheta));
-
-        mask_low = (alt_opt < glideLow) & (alt_opt >= cutoffAlt);
-        theta(mask_low) = finalTheta;
-
-        mask_free = alt_opt < cutoffAlt;
-        theta(mask_free) = 90;
-
-        rUnitVec = rdOptimTOPO./ max(vecnorm(rdOptimTOPO,2,1),1e-10);
-        vertUnitVec = [0;0;1];
-        dotProducts = rUnitVec' * vertUnitVec;
-        cGlide = cosd(theta)' - dotProducts;
-        c = [c;cGlide];
+        nGlideCon = floor(nodeCount * 0.15);
+    end
+    if pointingFlag
+        nPointCon = nodeCount;
     end
 
+    c = zeros(nThrustCon + nGlideCon + nPointCon, 1);
+    ceq = [];
 
-    % if glideSlopeFlag
-    %     glideNodes = floor(nodeCount*0.15);
-    %     freeGlideNodes = floor(nodeCount*0.01) + 1;
-    %     tgospanGlide = tgospan(1:glideNodes);
-    %     phi1hat = (tgospanGlide.^(gamma1+2))./((gamma1+1)*(gamma1+2));
-    %     phi2hat = (tgospanGlide.^(gamma2+2))./((gamma2+1)*(gamma2+2));
-    %     rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospanGlide + 0.5*(gConst+afStar).*tgospanGlide.^2;
+    idx = 1;
+    upper = thrust - (margin_top*maxThrust);
+    lower = minThrust - thrust;
+    c(idx:idx+nodeCount-1) = upper(:);
+    idx = idx + nodeCount;
+    c(idx:idx+nodeCount-1) = lower(:);
+    idx = idx + nodeCount;
+
+    % if glideSlopeFlag % make it sparse?
+    %     glideHigh = optimizationParams.glideSlopeHigh;
+    %     glideLow = optimizationParams.glideSlopeLow;
+    %     glideCut = optimizationParams.glideSlopeCutoff;
+    %     finalTheta = optimizationParams.glideSlopeFinalTheta;
+    %     cutoffAlt = tand(finalTheta) * glideCut;
+    %     phi1hat = (tgospan.^(gamma1+2))./((gamma1+1)*(gamma1+2));
+    %     phi2hat = (tgospan.^(gamma2+2))./((gamma2+1)*(gamma2+2));
+    %     rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospan + 0.5*(gConst+afStar).*tgospan.^2;
     %     rdOptimTOPO = MCMF2ENU(rdOptim,problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
-    %     rUnitVec = rdOptimTOPO./vecnorm(rdOptimTOPO,2,1);
-    % 
-    % 
-    %     if norm(rdOptimTOPO(:,1)) < 1e-10
-    %         rUnitVec(:,1) = [0;0;1];
-    %     end
-    %     vertUnitVec = [0;0;1];
-    % 
     %     rMoon = problemParams.rMoon;
     %     rdOptimDim = rdOptim*refVals.L_ref;
     %     alt_opt = vecnorm(rdOptimDim,2,1) - rMoon;
-    %     frac = (alt_opt - 250)/250;
-    %     frac(frac < 0) = 0;
-    %     frac(frac > 1) = 1;
-    %     theta = (frac*45) + 45;
-    %     theta(1:freeGlideNodes) = 90;
-    %     cGlide = zeros(glideNodes,1);
-    %     for idx = 1:glideNodes
-    %         cGlide(idx) = cosd(theta(idx)) - dot(rUnitVec(:,idx),vertUnitVec);
-    %     end
-    %     c = [c; cGlide];
+    % 
+    %     theta = zeros(1,nodeCount);
+    % 
+    %     mask_high = alt_opt > glideHigh; % Points above the constraint, theta = 90
+    %     theta(mask_high) = 180;
+    % 
+    %     mask_mid = (alt_opt <= glideHigh) & (alt_opt >= glideLow);
+    %     frac = (alt_opt(mask_mid) - glideLow) / (glideHigh-glideLow);
+    %     theta(mask_mid) = finalTheta + (frac.*(90-finalTheta));
+    % 
+    %     mask_low = (alt_opt < glideLow) & (alt_opt >= cutoffAlt);
+    %     theta(mask_low) = finalTheta;
+    % 
+    %     mask_free = alt_opt < cutoffAlt;
+    %     theta(mask_free) = 90;
+    % 
+    %     rUnitVec = rdOptimTOPO./ max(vecnorm(rdOptimTOPO,2,1),1e-10);
+    %     vertUnitVec = [0;0;1];
+    %     dotProducts = rUnitVec' * vertUnitVec;
+    %     cGlide = cosd(theta)' - dotProducts;
+    %     c = [c;cGlide];
     % end
 
+    % 
+    if glideSlopeFlag
+        glideNodes = floor(nodeCount*0.15);
+        freeGlideNodes = floor(nodeCount*0.01) + 1;
+        tgospanGlide = tgospan(1:glideNodes);
+        phi1hat = (tgospanGlide.^(gamma1+2))./((gamma1+1)*(gamma1+2));
+        phi2hat = (tgospanGlide.^(gamma2+2))./((gamma2+1)*(gamma2+2));
+        rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospanGlide + 0.5*(gConst+afStar).*tgospanGlide.^2;
+        rdOptimTOPO = rot_MCMF2ENU * (rdOptim - r0_MCMF_ND);
+        %rdOptimTOPO = MCMF2ENU(rdOptim,problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
+        rUnitVec = rdOptimTOPO./vecnorm(rdOptimTOPO,2,1);
+
+
+        if norm(rdOptimTOPO(:,1)) < 1e-10
+            rUnitVec(:,1) = [0;0;1];
+        end
+        vertUnitVec = [0;0;1];
+
+        rMoon = problemParams.rMoon;
+        rdOptimDim = rdOptim*refVals.L_ref;
+        alt_opt = vecnorm(rdOptimDim,2,1) - rMoon;
+        frac = (alt_opt - 250)/250;
+        frac(frac < 0) = 0;
+        frac(frac > 1) = 1;
+        theta = (frac*45) + 45;
+        theta(1:freeGlideNodes) = 90;
+        
+        cGlide = cosd(theta) - dot(rUnitVec, repmat(vertUnitVec, 1, glideNodes));
+        c(idx:idx+glideNodes-1) = cGlide;
+        idx = idx + glideNodes;
+    end
+
     if pointingFlag 
-        aTTOPO = MCMF2ENU(aT,problemParams.landingLatDeg,problemParams.landingLonDeg,false,false);
+        aTTOPO = rot_MCMF2ENU * aT;
+        %aTTOPO = MCMF2ENU(aT,problemParams.landingLatDeg,problemParams.landingLonDeg,false,false);
         aTmagTOPO = vecnorm(aTTOPO,2,1);
         thrustUnitVec = aTTOPO./aTmagTOPO;
         vertUnitVec = [0;0;1];
@@ -244,6 +266,23 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
         Theta(idxCon2) = phiA(idxCon2) + phi0;
 
         cPoint = phi - Theta;
-        c = [c;cPoint];
+        c(idx:idx+nodeCount-1) = cPoint;
     end
+end
+function [rot, r0_MCMF] = computeMCMF2ENUTransform(landingLatDeg, landingLonDeg, Rm)
+    
+    lat0 = deg2rad(landingLatDeg);
+    lon0 = deg2rad(landingLonDeg);
+    
+    clat = cos(lat0); slat = sin(lat0);
+    clon = cos(lon0); slon = sin(lon0);
+
+    E0 = [-slon;       clon;      0];
+    N0 = [-slat*clon; -slat*slon; clat];
+    U0 = [clat*clon;   clat*slon; slat];
+    
+    rot = [E0, N0, U0]';
+
+    % Landing site position in MCMF
+    r0_MCMF = Rm * U0;
 end

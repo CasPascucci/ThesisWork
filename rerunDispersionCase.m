@@ -28,12 +28,13 @@ function outputSingle = rerunDispersionCase(idx, PDINom, planetaryParams, target
     vehicle.massInit = vehicleNom.massInit * (1+ mass_mult);
     vehicle.dryMass = vehicle.massInit - 8248;
 
-    [gammaOpt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, beta, true, true, false);
+    [gammaOpt, gamma2Opt, krOpt, tgoOpt, ~, ~, optFuel, simFuel, ~, finalPosSim, ~, ~] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, beta, true, true, false, true);
+   
     outputSingle = struct;
     outputSingle.gamma = gammaOpt;
+    outputSingle.gamma2 = gamma2Opt;
     outputSingle.kr = krOpt;
     outputSingle.tgo = tgoOpt;
-    outputSingle.gamma2 = krOpt/(gammaOpt+2) - 2;
     outputSingle.optFuel = optFuel;
     outputSingle.simFuel = simFuel;
     outputSingle.finalError = finalPosSim;

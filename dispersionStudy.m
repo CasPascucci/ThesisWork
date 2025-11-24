@@ -31,18 +31,21 @@ targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
 targetState.delta_t   = 5; % seconds dim, for btt
 
 optimizationParams = struct;
-optimizationParams.nodeCount = 301; %Count must be odd for Simpson
+optimizationParams.nodeCount = 201; %Count must be odd for Simpson
 optimizationParams.glideSlopeFinalTheta = 45; %deg
+optimizationParams.glideSlopeHigh = 500; %m
+optimizationParams.glideSlopeLow = 250; %m
+optimizationParams.glideSlopeCutoff = 50; %m
 optimizationParams.glideSlopeEnabled = true;
-optimizationParams.pointingEnabled = false;
+optimizationParams.pointingEnabled = true;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
-optimizationParams.maxTiltRate = 5; %deg/s
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
 optimizationParams.updateFreq = 10;
 optimizationParams.updateStop = 140;
 optimizationParams.updateOpt = false;
 
-beta = 0.75;
+beta = 0.5;
+runSimulation = true; % needs to be true
 doPlotting = false; % disable this to not plot results
 verboseOutput = false;
 
@@ -106,11 +109,11 @@ parfor (idx = 1:caseCount)
         vehicle.dryMass = vehicle.massInit - 8248; % this way makes the dry mass variable but fuel amount constant
 
 
-        [gammaOpt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, beta, false, false, true);
-
+        [gammaOpt, gamma2Opt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim, ~, ~] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, beta, false, false, true);
+        
         Results(idx).k = idx;
         Results(idx).gamma = gammaOpt;
-        Results(idx).gamma2 = krOpt/(gammaOpt+2) - 2;
+        Results(idx).gamma2 = gamma2Opt;
         Results(idx).kr = krOpt;
         Results(idx).tgo = tgoOpt;
         Results(idx).fuel_opt = optFuel;
@@ -134,8 +137,8 @@ elapsed = toc(dispTime)
 done();
 
 %% Save Results
-if ~exist('Dispersion301_sqpNEWCOEFF','dir')
-    mkdir('Dispersion301_sqpNEWCOEFF');
+if ~exist('Dispersion201','dir')
+    mkdir('Dispersion201');
 end
 
 % Timestamp for the run
@@ -157,7 +160,7 @@ betaVal = beta * 100;
 suffix  = sprintf('%dbeta_%s_%s', round(betaVal), condTag, timeRun);
 
 runName = suffix;
-runDir  = fullfile('Dispersion301_sqpNEWCOEFF', runName);
+runDir  = fullfile('Dispersion201', runName);
 mkdir(runDir);
 
 % Filenames
@@ -170,9 +173,9 @@ save(matfile, 'Results');
 % Export summary CSV - might need non matlab app to examine results in
 % future
 T = table( (1:numel(Results)).', [Results.exit_ok].',[Results.gamma].', [Results.gamma2].', [Results.kr].', ...
-           [Results.tgo].', [Results.fuel_opt].', [Results.fuel_sim].', [Results.final_error].', [Results.coeff1].', [Results.coeff2].', ...
+           [Results.tgo].', [Results.fuel_opt].', [Results.fuel_sim].', vecnorm([Results.final_error].',2,2), [Results.coeff1].', [Results.coeff2].', ...
            [Results.coeff3].', [Results.coeff4].', ...
-           'VariableNames', {'k','exit_ok','gamma','gamma2','kr','tgo','fuel_opt','fuel_sim','final_error','coeff1','coeff2','coeff3','coeff4'} );
+           'VariableNames', {'k','exit_ok','gamma','gamma2','kr','tgo','fuel_opt','fuel_sim','final_error_norm','coeff1','coeff2','coeff3','coeff4'} );
 writetable(T, csvfile);
 
 %% Generate Stats Plots and Tables
@@ -267,7 +270,7 @@ disp('Exit flag summary:'); disp(ExitFlagTable);
 disp('Success summary:');   disp(SuccessTable);
 
 %% Rerun section
-rerunDispersionCase(8, PDINom, planetaryParams, targetState, vehicleNom, optimizationParams, beta, seeds)
+%rerunDispersionCase(1614, PDINom, planetaryParams, targetState, vehicleNom, optimizationParams, beta, seeds)
 %% Save both tables
 exitCsv   = fullfile(runDir, 'exitflag_summary.csv');
 succCsv   = fullfile(runDir, 'success_summary.csv');

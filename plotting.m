@@ -105,7 +105,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 % Optim Throttle
     figure('Name',"Optim Throttle"); hold on;
     thrustDim = aTNormOpt .* mOptim *(refVals.M_ref*refVals.A_ref);
-    plot(tspanOpt(:)*T_ref, thrustDim(:)/problemParams.maxThrustDim,'DisplayName','Throttle Profile');
+    plot(tspanOpt(2:end)*T_ref, thrustDim(2:end)/problemParams.maxThrustDim,'DisplayName','Throttle Profile');
     if hasUC && isfield(unconstrained,'aTOptim') && ~isempty(unconstrained.aTOptim) ...
          && isfield(unconstrained,'mOptim')  && ~isempty(unconstrained.mOptim)
 
@@ -119,7 +119,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         tgospanOptUC = linspace(0, tgo0UC, nodeCountUC);
         tspanOptUC   = tgo0UC - tgospanOptUC;
     
-        plot(tspanOptUC(:)*T_ref, thrustDimUC_optim(:)/problemParams.maxThrustDim, ...
+        plot(tspanOptUC(2:end)*T_ref, thrustDimUC_optim(2:end)/problemParams.maxThrustDim, ...
             'r-', 'LineWidth', 1.3, 'DisplayName','Throttle Profile (Unconstrained)');
         
     end
@@ -204,7 +204,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     UPlat = UPlat * ones(size(azPlat));
     
     figure('Name','Opt 3D'); hold on; grid on; axis equal;
-    plot3(ETraj/1000, NTraj/1000, UTraj/1000, 'b-', 'LineWidth', 2, 'MarkerSize',15);
+    plot3(ETraj/1000, NTraj/1000, UTraj/1000, 'b.-', 'LineWidth', 2, 'MarkerSize',15);
     surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8);
     plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 0.8);
     if ~isempty(rdOptimUC)
@@ -248,10 +248,10 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     aTOptimDim = aTOptim * A_ref;
     aTOptimTOPO = MCMF2ENU(aTOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
     figure('Name','Opt TOPO Accel'); hold on;
-    plot(tspanOpt(:)*T_ref, aTOptimTOPO(1,:), 'LineWidth', 1.5);
-    plot(tspanOpt(:)*T_ref, aTOptimTOPO(2,:), 'LineWidth', 1.5);
-    plot(tspanOpt(:)*T_ref, aTOptimTOPO(3,:), 'LineWidth', 1.5);
-    plot(tspanOpt(:)*T_ref, vecnorm(aTOptimTOPO(:,:),2,1), '-', 'LineWidth', 2);
+    plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(1,2:end), 'LineWidth', 1.5);
+    plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(2,2:end), 'LineWidth', 1.5);
+    plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(3,2:end), 'LineWidth', 1.5);
+    plot(tspanOpt(2:end)*T_ref, vecnorm(aTOptimTOPO(:,2:end),2,1), '-', 'LineWidth', 2);
     plot(tspanOpt(1)*T_ref,norm(nonDimParams.afStarND)*A_ref,'.','MarkerSize',10); % Plot afStar
     plot(tspanOpt(1)*T_ref,A_ref,'x','MarkerSize',10); % Plot 1g
     plot(tspanOpt(1)*T_ref,3*A_ref,'x','MarkerSize',10); % Plot 3g
@@ -262,10 +262,10 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 % Optim Acceleration Components MCMF
     aTOptimDim = aTOptimDim';
     figure('Name','Opt MCMF Accel'); hold on;
-    plot(tspanOpt(:)*T_ref, aTOptimDim(1,:), 'LineWidth', 1.5);
-    plot(tspanOpt(:)*T_ref, aTOptimDim(2,:), 'LineWidth', 1.5);
-    plot(tspanOpt(:)*T_ref, aTOptimDim(3,:), 'LineWidth', 1.5);
-    plot(tspanOpt(:)*T_ref, vecnorm(aTOptimDim(:,:),2,1), '-', 'LineWidth', 2);
+    plot(tspanOpt(2:end)*T_ref, aTOptimDim(1,2:end), 'LineWidth', 1.5);
+    plot(tspanOpt(2:end)*T_ref, aTOptimDim(2,2:end), 'LineWidth', 1.5);
+    plot(tspanOpt(2:end)*T_ref, aTOptimDim(3,2:end), 'LineWidth', 1.5);
+    plot(tspanOpt(2:end)*T_ref, vecnorm(aTOptimDim(:,2:end),2,1), '-', 'LineWidth', 2);
     plot(tspanOpt(1)*T_ref,norm(nonDimParams.afStarND)*A_ref,'.','MarkerSize',10); % Plot afStar
     plot(tspanOpt(1)*T_ref,A_ref,'x','MarkerSize',10); % Plot 1g
     plot(tspanOpt(1)*T_ref,3*A_ref,'x','MarkerSize',10); % Plot 3g
