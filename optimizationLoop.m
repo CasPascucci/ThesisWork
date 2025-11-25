@@ -1,4 +1,14 @@
 function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_t, verboseOutput, dispersion)
+
+    % Fmincon Constraints
+    Aineq = [-1  0  0;      % -gamma <= 0 ---- gamma >= 0
+              1 -1  0;      %  gamma -gamma2 <= -1e-4 ---- gamma2 >= gamma + 1e-4
+              0  0 -1];     % tgo >= 0.01
+    bineq = [0; -1e-4; -0.01];
+
+    lb = [0, 0, 0.01];
+    ub = [10, 10, 15];
+
     if nargin < 9
         dispersion = false;
     end
@@ -19,11 +29,6 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
         problemParams.landingLatDeg, ...
         problemParams.landingLonDeg, ...
         nonDimParams.rMoonND);
-
-    Aineq = optimizationParams.Aineq;
-    bineq = optimizationParams.bineq;
-    lb = optimizationParams.lb;
-    ub = optimizationParams.ub;
 
     fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
         'FiniteDifferenceType','forward','MaxIterations', 1000, ...
@@ -51,7 +56,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
         fprintf('  tgo   = %.6f (ND)\n', optParams(3));
     
         [c, ~] = nonlincon(optParams);
-        activeIneq = find(c >= -1e-6);
+        activeIneq = find(c >= -1e-6); % Nearly active
         fprintf('\nActive inequality constraints: %d/%d\n', length(activeIneq), length(c));
         [maxViolation, idx] = max(c);
         fprintf('Max violation: %.3f at constraint %d\n', maxViolation, idx);
@@ -85,8 +90,10 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     Q = Q(end) - Q;
 
     mOptim = 1 .* exp(-Q);
-end
 
+
+end
+%% Functions
 function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, v, gConst, nonDimParams, optimizationParams)
     gamma1  = params(1);
     gamma2     = params(2);
@@ -100,6 +107,7 @@ function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, 
         gamma2 = 0;
     end
 
+
     [c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, afStar, rfStar, vfStar, gConst);
 
     tspan = linspace(0,tgo,nodeCount);
@@ -112,6 +120,7 @@ function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, 
     simpson2 = simpsonComp13Integral(tspan,dot(aT,aT));
 
     cost = betaParam*simpson1 + (1-betaParam)*simpson2;
+
 end
 
 function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals, rot_MCMF2ENU, r0_MCMF_ND)
@@ -136,7 +145,7 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
 
     thrust = m .*(aTmag);
     if pointingFlag
-        margin_top = optimizationParams.marginTop;
+        margin_top = 0.95;
     else
         margin_top = 1.00;
     end
@@ -199,9 +208,9 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
         thrustUnitVec = aTTOPO./aTmagTOPO;
         vertUnitVec = [0;0;1];
         dotProducts = thrustUnitVec'*vertUnitVec;
-        phi = acosd(dotProducts);
+        phi = acosd(dotProducts); % Values at idx 1 are landing, idx end are PDI, Deg
         phi0 = optimizationParams.minPointing;
-        phiA = 0.5 * (optimizationParams.maxTiltAccel * refVals.T_ref^2) * (tgospan(:).^2);
+        phiA = 0.5 * (optimizationParams.maxTiltAccel * refVals.T_ref^2) * (tgospan(:).^2); % DEG
         Theta = zeros(nodeCount,1);
         idxCon1 = (phiA + phi0) >= 180;
         Theta(idxCon1) = 180;
@@ -212,8 +221,8 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
         c(idx:idx+nodeCount-1) = cPoint;
     end
 end
-
 function [rot, r0_MCMF] = computeMCMF2ENUTransform(landingLatDeg, landingLonDeg, Rm)
+
     lat0 = deg2rad(landingLatDeg);
     lon0 = deg2rad(landingLonDeg);
     
