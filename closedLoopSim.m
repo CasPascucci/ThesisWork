@@ -1,12 +1,10 @@
-function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma,gamma2,tgo0, problemParams, nonDimParams, refVals, delta_t)
+function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma,gamma2,tgo0, problemParams, nonDimParams, refVals, delta_t, simulationParams)
 
     kr = (gamma2+2)*(gamma+2);
 
     r0 = nonDimParams.r0ND;
     v0 = nonDimParams.v0ND;
     m0 = nonDimParams.m0ND;
-    landingLat = problemParams.landingLatDeg;
-    landingLon = problemParams.landingLonDeg;
 
     rMoonND = nonDimParams.rMoonND;
     isp = nonDimParams.ispND;
@@ -20,9 +18,9 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
 
 
     X0 = [r0; v0; m0];
-    odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
+    odeoptions = odeset('RelTol', simulationParams.odeRelTol, 'AbsTol', simulationParams.odeAbsTol);
      [tTraj, stateTraj] = ode45(@(t, X) trajectory(t, X, gamma, kr, ...
-                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref, refVals, gConst, nonDimParams.minThrustND, nonDimParams.maxThrustND, delta_t, BTT), linspace(0,tgo0,500), X0, odeoptions);
+                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref, gConst, nonDimParams.minThrustND, nonDimParams.maxThrustND, delta_t, BTT, simulationParams), linspace(0,tgo0,500), X0, odeoptions);
 
      rState = stateTraj(:,1:3);
      vState = stateTraj(:,4:6);
@@ -31,24 +29,19 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
     
      flag_thrustGotLimited = false;
      
-
      numStates = size(rState,1);
      aTList = zeros(3,numStates);
      aTNormList = zeros(1,numStates);
     
-
-
      for idx = 1:numStates
          r = rState(idx, :).';
          v = vState(idx, :).';
          m = mState(idx);
          tgo = tgoState(idx);
-         %g = -(rMoonND^2) * r / (norm(r)^3);
          gGuidance = gConst;
 
          minAccel = nonDimParams.minThrustND/m;
          maxAccel = nonDimParams.maxThrustND/m;
-         % BTT
          
          if BTT
              if (tgo * refVals.T_ref) > (1.5*delta_t)
@@ -79,8 +72,8 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
                      flag_thrustGotLimited = true;
                  end
              end
-         else    % No BTT
-             if (tgo * refVals.T_ref) > 0.2
+         else
+             if (tgo * refVals.T_ref) > simulationParams.minTime
                  aT1 = gamma*(kr/(2*gamma +4) -1)*afStar;
                  aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
                  aT3 = ((gamma+1)/tgo)*(1-kr/(gamma+2))*(vfStar-v);
@@ -103,9 +96,7 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
      end
 end
 
-
-%% Functions
-function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, afStar, T_ref, refVals, gConst, minThrust, maxThrust, delta_t, BTT)
+function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, afStar, T_ref, gConst, minThrust, maxThrust, delta_t, BTT, simulationParams)
     r    = X(1:3);
     v    = X(4:6);
     mass = X(7);
@@ -122,6 +113,7 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, 
     persistent vfVirtual
     persistent afVirtual
     persistent tgoVirt
+
     if BTT
         if (tgo * T_ref) > (1.5*delta_t)
             [rfVirtual, vfVirtual, afVirtual, tgoVirt] = computeBeyondTerminationTargeting(r, v, gamma, kr, rfStar, vfStar, afStar, delta_t, tgo, gGuidance);
@@ -137,7 +129,6 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, 
             end
             
         else
-
             aT1 = gamma*(kr/(2*gamma +4) -1)*afVirtual;
             aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
             aT3 = ((gamma+1)/tgoVirt)*(1-kr/(gamma+2))*(vfVirtual-v);
@@ -150,7 +141,7 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, 
             end
         end
     else
-        if (tgo * T_ref) > 0.2
+        if (tgo * T_ref) > simulationParams.minTime
             aT1 = gamma*(kr/(2*gamma +4) -1)*afStar;
             aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
             aT3 = ((gamma+1)/tgo)*(1-kr/(gamma+2))*(vfStar-v);

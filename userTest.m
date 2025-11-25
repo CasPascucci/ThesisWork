@@ -44,15 +44,35 @@ optimizationParams.minPointing = 10; %deg, floor for pointing constraint
 optimizationParams.updateFreq = 10;
 optimizationParams.updateStop = 60;
 optimizationParams.updateOpt = false; % Only Applies if Sim is also set to turn on
+optimizationParams.initialGuess = [0.3, 0.4, 6];
+optimizationParams.Aineq = [-1  0  0; 1 -1  0; 0  0 -1];
+optimizationParams.bineq = [0; -1e-4; -0.01];
+optimizationParams.lb = [0, 0, 0.01];
+optimizationParams.ub = [10, 10, 15];
+optimizationParams.marginTop = 0.95;
 
-beta = 0.5;
-runSimulation = true;
-doPlotting = true; % disable this to not plot results
-verboseOutput = true;
+simulationParams = struct;
+simulationParams.beta = 0.5;
+simulationParams.runSimulation = true;
+simulationParams.doPlotting = true;
+simulationParams.verboseOutput = true;
+simulationParams.minNodeCount = 21;
+simulationParams.gammaChangeThreshold = 0.5;
+simulationParams.minTime = 0.2;
+simulationParams.odeRelTol = 1e-6;
+simulationParams.odeAbsTol = 1e-6;
+
+constants = struct;
+constants.gEarth = 9.81;
+constants.L_ref = 10000;
+constants.T_ref = sqrt(constants.L_ref/planetaryParams.gPlanet);
+constants.A_ref = planetaryParams.gPlanet;
+constants.V_ref = constants.L_ref / constants.T_ref;
+constants.M_ref = 15103.0;
 
 tic
 [gammaOpt, gamma2Opt, krOpt, tgoOptSec,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim, optHistory, exitFlags] = getParams(PDIState,...
-    planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
+    planetaryParams, targetState, vehicleParams, optimizationParams, simulationParams, constants);
 toc
 % tgoOpt returned in seconds
 gammaOpt

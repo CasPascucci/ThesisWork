@@ -1,4 +1,4 @@
-function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, exitFlags] = simReOpt(gamma0,gamma20,tgo0, problemParams, nonDimParams, refVals, delta_t, optimizationParams, betaParam, verboseOutput)
+function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, exitFlags] = simReOpt(gamma0,gamma20,tgo0, problemParams, nonDimParams, refVals, delta_t, optimizationParams, betaParam, verboseOutput, simulationParams)
 
 kr0 = (gamma20+2)*(gamma0+2);
 
@@ -39,7 +39,7 @@ optHistory = [t_elapsed, gamma, gamma2, kr, tgo];
 exitFlags = [];
 exitFlags(1) = [99];
 
-odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
+odeoptions = odeset('RelTol', simulationParams.odeRelTol, 'AbsTol', simulationParams.odeAbsTol);
 
 if verboseOutput
     fprintf('\n=== Starting Re-Optimization Simulation ===\n');
@@ -50,7 +50,7 @@ if verboseOutput
     fprintf('==========================================\n\n');
 end
 segmentCount = 0;
-minTime = 0.2/refVals.T_ref;
+minTime = simulationParams.minTime / refVals.T_ref;
 
 % Main loop
     while tgo > updateStopND
@@ -123,17 +123,14 @@ minTime = 0.2/refVals.T_ref;
             fprintf('\nRe-optimizing at t=%.2f s (tgo=%.2f s)...\n', t_elapsed * refVals.T_ref, tgo * refVals.T_ref);
         end
         
-        % Scale node count proportional to tgo
         newNodeCount = round(initialNodeCount * (tgo / tgo0));
 
-        % Ensure odd number
         if mod(newNodeCount, 2) == 0
             newNodeCount = newNodeCount + 1;
         end
 
-        % Ensure minimum node count (e.g., 21 to give enough resolution for constraints)
-        if newNodeCount < 21
-            newNodeCount = 21;
+        if newNodeCount < simulationParams.minNodeCount
+            newNodeCount = simulationParams.minNodeCount;
         end
 
         if newNodeCount > initialNodeCount
@@ -150,11 +147,9 @@ minTime = 0.2/refVals.T_ref;
             problemParams, newNonDimParams, optimizationParams, refVals, delta_t, false, false);
 
         if exitflag > 0
-            % Check for unreasonable jumps
             gamma_change = abs(optParams(1) - gamma);
-            if gamma_change > 0.5  % More than 30% change
+            if gamma_change > simulationParams.gammaChangeThreshold
                 fprintf('WARNING: Large gamma jump (%.4f -> %.4f). Rejecting.\n', gamma, optParams(1));
-                % Don't update parameters
             else
                 gamma = optParams(1);
                 gamma2 = optParams(2);
@@ -162,7 +157,6 @@ minTime = 0.2/refVals.T_ref;
                 tgo = optParams(3);
             end
         else
-            % Keep previous parameters if optimization failed
             if verboseOutput
                 fprintf('WARNING: Optimization failed (exitflag=%d). Keeping previous parameters.\n', exitflag);
             end
@@ -186,8 +180,6 @@ minTime = 0.2/refVals.T_ref;
         end
         
         t_start = t_elapsed;
-
-        
         
         t_freeze = t_elapsed + (tgo -minTime)
         t_end = t_elapsed + tgo;
@@ -195,23 +187,18 @@ minTime = 0.2/refVals.T_ref;
         isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
         [t_start, t_freeze], X0, odeoptions);
     
-        % Compute final thrust acceleration to freeze
         r_freeze = stateSeg1(end, 1:3)';
         v_freeze = stateSeg1(end, 4:6)';
         m_freeze = stateSeg1(end, 7);
         [aT_frozen, ~] = computeAccel(r_freeze, v_freeze, m_freeze, gamma, kr, ...
             minTime, rfStar, vfStar, afStar, gGuidance, nonDimParams);
         
-        % Second part: frozen thrust acceleration
         X0_freeze = stateSeg1(end, :)';
         [tSeg2, stateSeg2] = ode45(@(t, X) trajectoryFrozenThrust(t, X, aT_frozen, ...
             isp, rMoonND), [t_freeze, t_end], X0_freeze, odeoptions);
         
-        % Combine segments
-        tSeg = [tSeg1; tSeg2(2:end)];  % Avoid duplicate point
+        tSeg = [tSeg1; tSeg2(2:end)];
         stateSeg = [stateSeg1; stateSeg2(2:end, :)];
-
-
     
         tTraj = [tTraj;tSeg];
         stateTraj = [stateTraj; stateSeg];
@@ -224,12 +211,10 @@ minTime = 0.2/refVals.T_ref;
             t_since_reopt = tSeg(i) - t_elapsed;
             tgo_now = tgo - t_since_reopt;
             
-            % Use active guidance until threshold, then freeze
             if tgo_now > minTime
                 [aTi, limited] = computeAccel(r, v, m, gamma, kr, tgo_now, rfStar, vfStar, afStar, gGuidance, nonDimParams);
                 flag_thrustGotLimited = flag_thrustGotLimited || limited;
             else
-                % Use frozen value (already computed above)
                 aTi = aT_frozen;
             end
             segAT(:, i) = aTi;
@@ -251,18 +236,15 @@ end
 
 
 function [aTi, limited] = computeAccel(r, v, m, gamma, kr, tgo, rfStar, vfStar, afStar, gGuidance, nonDimParams)
-    % Compute thrust acceleration with limits
     minAccel = nonDimParams.minThrustND / m;
     maxAccel = nonDimParams.maxThrustND / m;
     
-    % Guidance law
     aT1 = gamma * (kr/(2*gamma + 4) - 1) * afStar;
     aT2 = (gamma*kr/(2*gamma+4) - gamma - 1) * gGuidance;
     aT3 = ((gamma+1)/tgo) * (1 - kr/(gamma+2)) * (vfStar - v);
     aT4 = (kr/tgo^2) * (rfStar - r - v*tgo);
     aTi = aT1 + aT2 + aT3 + aT4;
     
-    % Apply thrust limits
     normAT = norm(aTi);
     if normAT > maxAccel
         aTi = aTi / normAT * maxAccel;
@@ -276,56 +258,38 @@ function [aTi, limited] = computeAccel(r, v, m, gamma, kr, tgo, rfStar, vfStar, 
 end
 
 function dXdt = trajectorySegmentODE(t, X, t_reopt_start, gamma, kr, tgo_at_reopt, isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams)
-    % ODE function for trajectory segment
-    % t - current time (elapsed from simulation start)
-    % t_reopt_start - time when current parameters were set
-    % tgo_at_reopt - time-to-go when current parameters were set
-    
     r = X(1:3);
     v = X(4:6);
     m = X(7);
     
-    % Calculate current time-to-go
     t_since_reopt = t - t_reopt_start;
     tgo = tgo_at_reopt - t_since_reopt;
     
-    % Ensure tgo doesn't go negative
     if tgo < 0.001
         tgo = 0.001;
     end
     
-    % Gravitational acceleration
     g = -(rMoonND^2) * r / (norm(r)^3);
     
-    % Compute thrust acceleration
     [aT, ~] = computeAccel(r, v, m, gamma, kr, tgo, rfStar, vfStar, afStar, gGuidance, nonDimParams);
     
-    % Thrust magnitude and mass flow rate
     F_mag = norm(aT) * m;
     dm_dt = -F_mag / isp;
     
-    % State derivatives
     dXdt = [v; aT + g; dm_dt];
 end
 
 function dXdt = trajectoryFrozenThrust(t, X, aT_frozen, isp, rMoonND)
-    % ODE function for trajectory with frozen thrust acceleration
-    % Used to avoid singularity when tgo approaches zero
-    
     r = X(1:3);
     v = X(4:6);
     m = X(7);
     
-    % Gravitational acceleration
     g = -(rMoonND^2) * r / (norm(r)^3);
     
-    % Use frozen thrust acceleration
     aT = aT_frozen;
     
-    % Thrust magnitude and mass flow rate
     F_mag = norm(aT) * m;
     dm_dt = -F_mag / isp;
     
-    % State derivatives
     dXdt = [v; aT + g; dm_dt];
 end
