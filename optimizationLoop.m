@@ -2,6 +2,15 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     if nargin < 9
         dispersion = false;
     end
+
+    % Some Tweakable Parameters / Defaults
+    if optimizationParams.gamma1eps < 0
+        optimizationParams.gamma1eps = 1e-8;
+    end
+    if optimizationParams.gamma2eps < 0
+        optimizationParams.gamma2eps = 1e-8;
+    end
+    % Initiailizing
     r0 = nonDimParams.r0ND;
     v0 = nonDimParams.v0ND;
 
@@ -21,13 +30,13 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
         nonDimParams.rMoonND);
 
     % Fmincon Constraints
-    Aineq = [-1  0  0;      % -gamma <= 0 ---- gamma >= 0
+    Aineq = [-1  0  0;      % -gamma <= -gamma1eps ---- gamma >= gamma1eps
               1 -1  0;      %  gamma -gamma2 <= -1e-4 ---- gamma2 >= gamma + 1e-4
               0  0 -1];     % tgo >= 0.01
-    bineq = [0; -1e-4; -0.01];
+    bineq = [-optimizationParams.gamma1eps; -optimizationParams.gamma2eps; -0.01];
 
     lb = [0, 0, 0.01];
-    ub = [10, 10, 15];
+    ub = [5, 10, 11];
 
         if dispersion || optimizationParams.updateOpt
             fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...

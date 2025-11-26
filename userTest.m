@@ -38,12 +38,19 @@ optimizationParams.glideSlopeHigh = 500; %m
 optimizationParams.glideSlopeLow = 250; %m
 optimizationParams.glideSlopeCutoff = 50; %m
 optimizationParams.glideSlopeEnabled = false;
+
 optimizationParams.pointingEnabled = false;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
+
 optimizationParams.updateFreq = 10;
 optimizationParams.updateStop = 60;
-optimizationParams.updateOpt = true; % Only Applies if Sim is also set to turn on
+optimizationParams.updateOpt = false; % Only Applies if Sim is also set to turn on
+
+optimizationParams.gamma1eps = 1e-8;
+optimizationParams.gamma2eps = 1e-8;
+
+
 
 beta = 0.5;
 runSimulation = true;
@@ -51,7 +58,7 @@ doPlotting = true; % disable this to not plot results
 verboseOutput = true;
 
 tic
-[gammaOpt, gamma2Opt, krOpt, tgoOptSec,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim, optHistory, ICStates, exitFlags] = getParams(PDIState,...
+[gammaOpt, gamma2Opt, krOpt, tgoOptSec,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim, optHistory, ICStates, exitFlags, problemParams, nonDimParams, refVals] = getParams(PDIState,...
     planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
 toc
 % tgoOpt returned in seconds
@@ -61,3 +68,6 @@ krOpt
 tgoOptSec
 optFuelCost
 simFuelCost
+
+%% ReOpt Single Run Testing
+%outputSingle = reOptReRun(5, ICStates, optHistory, beta, problemParams, nonDimParams, optimizationParams, refVals, targetState.delta_t / refVals.T_ref, verboseOutput)

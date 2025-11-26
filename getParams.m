@@ -1,4 +1,4 @@
-function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags] = ...
+function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals] = ...
     getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation)
 
     addpath([pwd, '/CoordinateFunctions']);
@@ -63,6 +63,17 @@ if nargin < 10
     runSimulation = true;
 end
 
+% Planetary Params Breakout:
+rPlanet            = planetaryParams.rPlanet;
+gPlanet            = planetaryParams.gPlanet;
+
+% Default Constants (not user defined)
+gEarth = 9.81;
+L_ref = 10000;
+T_ref = sqrt(L_ref/gPlanet);
+A_ref = gPlanet;
+V_ref = L_ref / T_ref;
+M_ref = 15103.0;
 
 % PDI Breakout:
 altitude_km        = PDIState.altitude / 1000;
@@ -86,18 +97,6 @@ dryMass            = vehicleParams.dryMass;
 isp                = vehicleParams.isp;
 maxThrust          = vehicleParams.maxThrust;
 minThrust          = vehicleParams.minThrust;
-
-% Planetary Params Breakout:
-rPlanet            = planetaryParams.rPlanet;
-gPlanet            = planetaryParams.gPlanet;
-
-% Default Constants (not user defined)
-gEarth = 9.81;
-L_ref = 10000;
-T_ref = sqrt(L_ref/gPlanet);
-A_ref = gPlanet;
-V_ref = L_ref / T_ref;
-M_ref = 15103.0;
 
 %% Setup and NonDimensionalization
 
@@ -248,43 +247,3 @@ if needsPlotting
     plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained);
 end
 
-% % Run Unconstrained Opt and Sim for Plotting
-% if ~dispersion
-%     fprintf("-----------------------------------------------\n");
-%     fprintf("Unconstrained OPT for Plotting");
-%     optimizationParamsUC = optimizationParams;
-%     optimizationParamsUC.glideSlopeEnabled = false;
-%     optimizationParamsUC.pointingEnabled = false;
-%     [optParamsUC,optCostUC, aTOptimUC, mOptimUC, rdOptimUC, vdOptimUC] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParamsUC, refVals, delta_tND, false);
-%     ucOptFuelCost = (mOptimUC(end)-mOptimUC(1))*M_ref;
-%     gammaOptUC = optParamsUC(1);
-%     gamma2OptUC = optParamsUC(2);
-%     tgoOptUC = optParamsUC(3) * T_ref;
-%     [tTrajUC, stateTrajUC, aTListUC, flag_thrustGotLimitedUC] = closedLoopSim(gammaOptUC, gamma2OptUC, tgoOptUC/T_ref, problemParams, nonDimParams, refVals, delta_tND);
-%     ucSimFuelCost = M_ref*(stateTrajUC(1,7) - stateTrajUC(end,7));
-%     unconstrained = struct('tTraj',tTrajUC,'stateTraj',stateTrajUC,'optParams',optParamsUC,'optCost',optCostUC,'aTOptim',aTOptimUC,'mOptim',mOptimUC,'rdOptim',rdOptimUC,'vdOptim',vdOptimUC,'aTList',aTListUC,'flag_thrustGotLimited',flag_thrustGotLimitedUC);
-%     fprintf("-----------------------------------------------");
-% end
-% % Plotting Handling
-%     if nargout > 5 || doPlots
-%         if ~ reopt
-%             [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
-%         else
-%             [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, exitFlags] = simReOpt(gammaOpt,gamma2Opt,tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
-%         end
-%         if ~exist("optHistory","var")
-%             optHistory = [];
-%         else
-%             optHistory = array2table(optHistory);
-%             optHistory.Properties.VariableNames(1:5) = {'t_elapsedND','gamma1','gamma2','kr','tgoND'};
-%         end
-%         if ~exist("exitFlags","var")
-%             exitFlags = [];
-%         end
-%         simFuelCost = M_ref*(stateTraj(1,7) - stateTraj(end,7));
-%         finalPosSim = MCMF2ENU(stateTraj(end,1:3)'*L_ref,landingLatDeg,landingLonDeg,true,true);
-%         if doPlots
-%             plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained);
-%         end
-%     end
-end
