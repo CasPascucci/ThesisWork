@@ -124,23 +124,12 @@ minTime = 0.2/refVals.T_ref;
         end
         
         % Scale node count proportional to tgo
-
         newNodeCount = ceil(initialNodeCount * (tgo / tgo0));
         % Ensure odd number
         if mod(newNodeCount, 2) == 0
             newNodeCount = newNodeCount + 1;
         end
 
-        % Ensure minimum node count (e.g., 21 to give enough resolution for constraints)
-        if newNodeCount < 21
-            newNodeCount = 21;
-        end
-
-        if newNodeCount > initialNodeCount
-            newNodeCount = initialNodeCount;
-        end
-
->>>>>>> aec3713 (Scale reoptimization node count proportional to tgo)
         optimizationParams.nodeCount = newNodeCount;
 
         if verboseOutput

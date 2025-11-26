@@ -45,7 +45,7 @@ optimizationParams.minPointing = 10; %deg, floor for pointing constraint
 
 optimizationParams.updateFreq = 10;
 optimizationParams.updateStop = 60;
-optimizationParams.updateOpt = false; % Only Applies if Sim is also set to turn on
+optimizationParams.updateOpt = true; % Only Applies if Sim is also set to turn on
 
 optimizationParams.gamma1eps = 1e-8;
 optimizationParams.gamma2eps = 1e-8;
