@@ -109,7 +109,7 @@ parfor (idx = 1:caseCount)
         vehicle.dryMass = vehicle.massInit - 8248; % this way makes the dry mass variable but fuel amount constant
 
 
-        [gammaOpt, gamma2Opt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim, ~, ~] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, beta, false, false, true);
+        [gammaOpt, gamma2Opt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim, ~, ~, ~] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, beta, false, false, true);
         
         Results(idx).k = idx;
         Results(idx).gamma = gammaOpt;

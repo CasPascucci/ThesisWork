@@ -1,4 +1,4 @@
-function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, exitFlags] = simReOpt(gamma0,gamma20,tgo0, problemParams, nonDimParams, refVals, delta_t, optimizationParams, betaParam, verboseOutput)
+function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = simReOpt(gamma0,gamma20,tgo0, problemParams, nonDimParams, refVals, delta_t, optimizationParams, betaParam, verboseOutput)
 
 kr0 = (gamma20+2)*(gamma0+2);
 
@@ -37,7 +37,7 @@ aTList = [];
 flag_thrustGotLimited = false;
 optHistory = [t_elapsed, gamma, gamma2, kr, tgo];
 exitFlags = [];
-exitFlags(1) = [99];
+exitFlags(1) = 99;
 
 odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
 
@@ -95,7 +95,7 @@ minTime = 0.2/refVals.T_ref;
     
         X0 = stateSeg(end,:)';
         ICstates(:,ICcounter) = X0;
-        ICcounter = ICcounter + 2;
+        ICcounter = ICcounter + 1;
 
         t_elapsed = tSeg(end);
     
@@ -124,22 +124,12 @@ minTime = 0.2/refVals.T_ref;
         end
         
         % Scale node count proportional to tgo
-        newNodeCount = round(initialNodeCount * (tgo / tgo0));
-
+        newNodeCount = ceil(initialNodeCount * (tgo / tgo0));
         % Ensure odd number
         if mod(newNodeCount, 2) == 0
             newNodeCount = newNodeCount + 1;
         end
-
-        % Ensure minimum node count (e.g., 21 to give enough resolution for constraints)
-        if newNodeCount < 21
-            newNodeCount = 21;
-        end
-
-        if newNodeCount > initialNodeCount
-            newNodeCount = initialNodeCount;
-        end
-
+        
         optimizationParams.nodeCount = newNodeCount;
 
         if verboseOutput
