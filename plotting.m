@@ -12,7 +12,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         labelSecSim  = 'Static Baseline Flight';
         
         labelMainOpt = 'Initial Plan'; 
-        % In Re-Opt, we do NOT plot secondary optimization plans because they are identical at t=0
+        % In Re-Opt, the "Secondary" plan is identical to the "Main" plan at t=0.
         plotSecondaryOptim = false; 
         
         titleSuffixSim  = ' (Re-Opt vs Static)';
@@ -25,7 +25,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         labelMainOpt = 'Constrained Plan';
         labelSecOpt  = 'Unconstrained Plan';
         
-        plotSecondaryOptim = true; 
+        plotSecondaryOptim = true; % We want to compare the plans here
         
         titleSuffixSim  = ' (Constrained vs Unconstrained)';
         titleSuffixOpt  = ' (Constrained vs Unconstrained)';
@@ -211,7 +211,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     
     % Generate Glideslope Cone Visualization
     theta_fun = @(u) min(89.9, 45 + 45 * max(0, min(1, (u - 250) ./ 250))); 
-    Umin = 0; % Force 0 floor
+    Umin = 0; 
     Umax = min(500, max(UTraj_Plot, [], 'omitnan')); 
     if isempty(Umax) || isnan(Umax); Umax = 500; end
     U_samp = linspace(Umin, Umax, 360);
@@ -554,8 +554,8 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             phiSim      = acosd(dotUp);                         
             
             phi0_deg   = optimParams.minPointing;
-          
             
+            % FIXED: Calculate Tgo based on Actual Landing Time
             tgoSim = (tTraj(end) - tTraj) * T_ref; 
             phiA_deg = 0.5 * (optimParams.maxTiltAccel) .* (tgoSim.^2);
             ThetaSim = min(180, phi0_deg + phiA_deg);
@@ -566,7 +566,6 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
                 dotUpSec  = max(-1, min(1, thrustU_ENU_Sec(:,3)));
                 phiSimSec = acosd(dotUpSec);
                 
-                % FIXED: Calculate Tgo for Secondary trace as well
                 tgoSecCalc = (tTrajSec(end) - tTrajSec) * T_ref;
                 phiA_deg_Sec = 0.5 * (optimParams.maxTiltAccel) .* (tgoSecCalc.^2);
                 ThetaSimSec = min(180, phi0_deg + phiA_deg_Sec);
@@ -579,8 +578,6 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             plot(tTraj*T_ref, ThetaSim, 'k--', 'LineWidth', 1.6, 'DisplayName','\Theta limit');
             if hasSec
                 plot(tTrajSec*T_ref, phiSimSec, 'r-', 'LineWidth', 1.2, 'DisplayName',[labelSecSim ' \phi']);
-                % Optional: plot secondary limit if you want to see the timing difference
-                % plot(tTrajSec*T_ref, ThetaSimSec, 'r:', 'LineWidth', 1, 'HandleVisibility','off');
             end
             xlabel('Time s'); ylabel('Angle deg');
             title('Pointing angle versus limit');
@@ -627,6 +624,17 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             [c1, c2] = calculateCoeffs(r_i, v_i, tgoSolved_ND(i), gamma_hist(i), gamma2_hist(i), afStar, rfStar, vfStar, gConst);
             c1_norm(i) = norm(c1);
             c2_norm(i) = norm(c2);
+        end
+        
+        % NEW: Append final point to extend lines to end of flight
+        if hasSimData
+            tFinal = tTraj(end) * refVals.T_ref;
+            x_opt = [x_opt; tFinal];
+            gamma_hist = [gamma_hist; gamma_hist(end)];
+            gamma2_hist = [gamma2_hist; gamma2_hist(end)];
+            tgoSolved = [tgoSolved; 0]; % Tgo goes to 0
+            c1_norm = [c1_norm; c1_norm(end)];
+            c2_norm = [c2_norm; c2_norm(end)];
         end
         
         nexttile; plot(x_opt, gamma_hist, 'LineWidth', 2); title('\gamma_1'); grid on;

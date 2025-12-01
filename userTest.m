@@ -38,7 +38,7 @@ optimizationParams = struct;
 optimizationParams.nodeCount = 301; % Must be odd for Simpson's rule
 
 % Glideslope Constraints
-optimizationParams.glideSlopeEnabled    = true;
+optimizationParams.glideSlopeEnabled    = false;
 optimizationParams.glideSlopeFinalTheta = 45;  % deg
 optimizationParams.glideSlopeHigh       = 500; % m
 optimizationParams.glideSlopeLow        = 250; % m
@@ -55,11 +55,11 @@ optimizationParams.updateFreq = 10;   % s
 optimizationParams.updateStop = 30;   % s (Time before landing to stop updates)
 
 % Tolerances
-optimizationParams.gamma1eps = 1e-4;
-optimizationParams.gamma2eps = 1e-4;
+optimizationParams.gamma1eps = 1e-2;
+optimizationParams.gamma2eps = 1e-2;
 
 %% 3. Execution Flags & Run
-beta          = 0.5;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta          = 0.7;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 runSimulation = true;
 doPlotting    = true; 
 verboseOutput = true;

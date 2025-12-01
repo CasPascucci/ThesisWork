@@ -5,10 +5,10 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
 
     % Some Tweakable Parameters / Defaults
     if optimizationParams.gamma1eps < 0
-        optimizationParams.gamma1eps = 1e-8;
+        optimizationParams.gamma1eps = 1e-2;
     end
     if optimizationParams.gamma2eps < 0
-        optimizationParams.gamma2eps = 1e-8;
+        optimizationParams.gamma2eps = 1e-2;
     end
     % Initiailizing
     r0 = nonDimParams.r0ND;
