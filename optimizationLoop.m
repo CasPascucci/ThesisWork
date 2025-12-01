@@ -86,7 +86,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
                 fprintf('  c(%d) = %.4f\n', violated(vi), c(violated(vi)));
             end
             fprintf('Max violation: c(%d) = %.6f\n', find(c==max(c),1), max(c));
-        end
+    end
 
     
 

@@ -38,7 +38,7 @@ optimizationParams = struct;
 optimizationParams.nodeCount = 301; % Must be odd for Simpson's rule
 
 % Glideslope Constraints
-optimizationParams.glideSlopeEnabled    = false;
+optimizationParams.glideSlopeEnabled    = true;
 optimizationParams.glideSlopeFinalTheta = 45;  % deg
 optimizationParams.glideSlopeHigh       = 500; % m
 optimizationParams.glideSlopeLow        = 250; % m
@@ -52,7 +52,7 @@ optimizationParams.minPointing     = 10; % deg
 % Re-Optimization Settings
 optimizationParams.updateOpt  = true; 
 optimizationParams.updateFreq = 10;   % s
-optimizationParams.updateStop = 60;   % s (Time before landing to stop updates)
+optimizationParams.updateStop = 30;   % s (Time before landing to stop updates)
 
 % Tolerances
 optimizationParams.gamma1eps = 1e-4;
@@ -72,7 +72,11 @@ tic
 toc
 
 %% 4. Results Display
-fprintf('\n--- Final Results ---\n');
+if optimizationParams.updateOpt
+    fprintf("\n--- Initial Solution ---\n")
+else
+    fprintf('\n--- Final Results ---\n');
+end
 fprintf('Gamma1:      %.4f\n', gammaOpt);
 fprintf('Gamma2:      %.4f\n', gamma2Opt);
 fprintf('Kr:          %.4f\n', krOpt);
