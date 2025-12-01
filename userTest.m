@@ -1,71 +1,90 @@
 clear all; close all; clc; format short
-%% Function to use for Single Runs
-% All values are dimensional
-PDIState = struct;
-PDIState.altitude           = 15240; % m
-PDIState.lonInitDeg         = 41.85; % deg
-PDIState.latInitDeg         = -71.59; % deg
-PDIState.inertialVelocity   = 1693.8; % m/s
-PDIState.flightPathAngleDeg = 0; % deg
-PDIState.azimuth            = 180; % deg
 
+%% 1. Initial State Definitions
+% PDI (Powered Descent Initiation) State - Dimensional
+PDIState = struct;
+PDIState.altitude           = 15240;   % m
+PDIState.lonInitDeg         = 41.85;   % deg
+PDIState.latInitDeg         = -71.59;  % deg
+PDIState.inertialVelocity   = 1693.8;  % m/s
+PDIState.flightPathAngleDeg = 0;       % deg
+PDIState.azimuth            = 180;     % deg
+
+% Planetary Constants (Moon)
 planetaryParams = struct;
 planetaryParams.rPlanet = 1736.01428 * 1000; % m
-planetaryParams.gPlanet = 1.622; % m/s^2
-planetaryParams.gEarth = 9.81; % m/s^2
+planetaryParams.gPlanet = 1.622;             % m/s^2
+planetaryParams.gEarth  = 9.81;              % m/s^2
 
+% Vehicle Parameters
 vehicleParams = struct;
-vehicleParams.massInit = 15103.0; % kg
-vehicleParams.dryMass = vehicleParams.massInit - 8248; % kg
-vehicleParams.isp = 311; % s
-vehicleParams.maxThrust = 45000; % N
-vehicleParams.minThrust = 4500; % N
+vehicleParams.massInit  = 15103.0; % kg
+vehicleParams.dryMass   = vehicleParams.massInit - 8248; % kg
+vehicleParams.isp       = 311;     % s
+vehicleParams.maxThrust = 45000;   % N
+vehicleParams.minThrust = 4500;    % N
 
+% Target Landing State
 targetState = struct;
-targetState.landingLonDeg      = 41.85; % deg
-targetState.landingLatDeg      = -90.0; % deg
-targetState.rfLanding = [0;0;0]; % m, TOPO frame centered at landing site lat/lon, and lunar radius
-targetState.vfLanding = [0;0;-1]; % m/s
-targetState.afLanding = [0;0;2*planetaryParams.gPlanet]; % m/s^2
-%targetState.afLanding = [0;0;vehicleParams.maxThrust/(6710)]; % This
-                                                               %afStar seems to be too high for a solvable path
-targetState.delta_t   = 5; % seconds dim, for btt, not implemented
+targetState.landingLonDeg = 41.85; % deg
+targetState.landingLatDeg = -90.0; % deg
+targetState.rfLanding     = [0; 0; 0]; % m (TOPO)
+targetState.vfLanding     = [0; 0; -1]; % m/s
+targetState.afLanding     = [0; 0; 2*planetaryParams.gPlanet]; % m/s^2
+targetState.delta_t       = 5; % s (BTT parameter, not yet implemented)
 
+%% 2. Optimization Configuration
 optimizationParams = struct;
-optimizationParams.nodeCount = 301; %Count must be odd for Simpson
-optimizationParams.glideSlopeFinalTheta = 45; %deg
-optimizationParams.glideSlopeHigh = 500; %m
-optimizationParams.glideSlopeLow = 250; %m
-optimizationParams.glideSlopeCutoff = 50; %m
-optimizationParams.glideSlopeEnabled = false;
+optimizationParams.nodeCount = 301; % Must be odd for Simpson's rule
 
+% Glideslope Constraints
+optimizationParams.glideSlopeEnabled    = false;
+optimizationParams.glideSlopeFinalTheta = 45;  % deg
+optimizationParams.glideSlopeHigh       = 500; % m
+optimizationParams.glideSlopeLow        = 250; % m
+optimizationParams.glideSlopeCutoff     = 50;  % m
+
+% Pointing Constraints
 optimizationParams.pointingEnabled = false;
-optimizationParams.maxTiltAccel = 2; % deg/s^2
-optimizationParams.minPointing = 10; %deg, floor for pointing constraint
+optimizationParams.maxTiltAccel    = 2;  % deg/s^2
+optimizationParams.minPointing     = 10; % deg
 
-optimizationParams.updateFreq = 10;
-optimizationParams.updateStop = 60;
-optimizationParams.updateOpt = true; % Only Applies if Sim is also set to turn on
+% Re-Optimization Settings
+optimizationParams.updateOpt  = true; 
+optimizationParams.updateFreq = 10;   % s
+optimizationParams.updateStop = 60;   % s (Time before landing to stop updates)
 
-optimizationParams.gamma1eps = 1e-8;
-optimizationParams.gamma2eps = 1e-8;
+% Tolerances
+optimizationParams.gamma1eps = 1e-4;
+optimizationParams.gamma2eps = 1e-4;
 
-beta = 0.5;
+%% 3. Execution Flags & Run
+beta          = 0.5;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 runSimulation = true;
-doPlotting = true; % disable this to not plot results
+doPlotting    = true; 
 verboseOutput = true;
 
 tic
-[gammaOpt, gamma2Opt, krOpt, tgoOptSec,~,~, optFuelCost, simFuelCost, aTSim,finalPosSim, optHistory, ICStates, exitFlags, problemParams, nonDimParams, refVals] = getParams(PDIState,...
-    planetaryParams, targetState, vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
+[gammaOpt, gamma2Opt, krOpt, tgoOptSec, ~, ~, optFuelCost, simFuelCost, ...
+ aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, ...
+ nonDimParams, refVals] = testgetParams(PDIState, planetaryParams, targetState, ...
+    vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
 toc
-% tgoOpt returned in seconds
-gammaOpt
-gamma2Opt
-krOpt
-tgoOptSec
-optFuelCost
-simFuelCost
 
-%% ReOpt Single Run Testing
-%outputSingle = reOptReRun(5, ICStates, optHistory, beta, problemParams, nonDimParams, optimizationParams, refVals, targetState.delta_t / refVals.T_ref, verboseOutput)
+%% 4. Results Display
+fprintf('\n--- Final Results ---\n');
+fprintf('Gamma1:      %.4f\n', gammaOpt);
+fprintf('Gamma2:      %.4f\n', gamma2Opt);
+fprintf('Kr:          %.4f\n', krOpt);
+fprintf('Tgo (sec):   %.2f\n', tgoOptSec);
+fprintf('Opt Cost:    %.2f kg\n', optFuelCost);
+fprintf('Sim Cost:    %.2f kg\n', simFuelCost);
+
+%% 5. Single Segment Re-Run
+% Use this block to isolate and troubleshoot specific re-optimization segments
+if optimizationParams.updateOpt
+    % segmentIdx = 63;
+    % outputSingle = reOptReRun(segmentIdx, ICstates, optHistory, beta, ...
+    %     problemParams, nonDimParams, optimizationParams, refVals, ...
+    %     targetState.delta_t / refVals.T_ref, verboseOutput);
+end

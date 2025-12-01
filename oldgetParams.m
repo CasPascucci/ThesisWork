@@ -244,6 +244,6 @@ end
 
 %If doing Plots
 if needsPlotting
-    plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained);
+    testplotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, unconstrained, optHistory, ICstates);
 end
 

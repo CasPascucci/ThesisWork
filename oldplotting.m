@@ -1,5 +1,5 @@
 % Plotting function for Single Runs
-function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, unconstrained)
+function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, unconstrained, optHistory, ICstates)
     % Check if simulation data is available
     hasSimData = ~isempty(tTraj) && ~isempty(stateTraj) && ~isempty(aTList);
     
@@ -460,50 +460,165 @@ if hasSimData
     
 % Figure 9: Pointing angle vs limit (Sim)
 % Compute pointing angle phi from thrust direction in ENU
-
-epsMag = 1e-12;
-aMag   = vecnorm([aE aN aU], 2, 2);
-thrustU_ENU = [aE aN aU] ./ aMag;          % unit thrust direction
-dotUp       = max(-1, min(1, thrustU_ENU(:,3)));   % dot with [0 0 1]
-phiSim      = acosd(dotUp);                         % deg
-
-phi0_deg   = optimParams.minPointing;
-phiA_deg   = 0.5 * (optimParams.maxTiltAccel) .* (tgoDim.^2);
-ThetaSim   = min(180, phi0_deg + phiA_deg);
-
-if hasUC
-    % Unconstrained pointing
-    aMagUC   = max(aT_norm_ENU_UC, epsMag);
-    thrustU_ENU_UC = [aE_UC aN_UC aU_UC] ./ aMagUC;
-    dotUpUC  = max(-1, min(1, thrustU_ENU_UC(:,3)));
-    phiSimUC = acosd(dotUpUC);
+if optimParams.pointingEnabled
+    epsMag = 1e-12;
+    aMag   = vecnorm([aE aN aU], 2, 2);
+    thrustU_ENU = [aE aN aU] ./ aMag;          % unit thrust direction
+    dotUp       = max(-1, min(1, thrustU_ENU(:,3)));   % dot with [0 0 1]
+    phiSim      = acosd(dotUp);                         % deg
+    
+    phi0_deg   = optimParams.minPointing;
+    phiA_deg   = 0.5 * (optimParams.maxTiltAccel) .* (tgoDim.^2);
+    ThetaSim   = min(180, phi0_deg + phiA_deg);
+    
+    if hasUC
+        % Unconstrained pointing
+        aMagUC   = max(aT_norm_ENU_UC, epsMag);
+        thrustU_ENU_UC = [aE_UC aN_UC aU_UC] ./ aMagUC;
+        dotUpUC  = max(-1, min(1, thrustU_ENU_UC(:,3)));
+        phiSimUC = acosd(dotUpUC);
+    end
+    
+    figure('Name','Pointing vs Limit (Sim)'); tiledlayout(2,1);
+    
+    % Top: angles
+    nexttile; hold on; grid on;
+    plot(tTraj*T_ref, phiSim, 'b-', 'LineWidth', 1.6, 'DisplayName','\phi (Sim)');
+    plot(tTraj*T_ref, ThetaSim, 'b--', 'LineWidth', 1.6, 'DisplayName','\Theta limit');
+    if hasUC
+        plot(tTrajUC*T_ref, phiSimUC, 'r-', 'LineWidth', 1.2, 'DisplayName','\phi (Sim UC)');
+    end
+    xlabel('Time s'); ylabel('Angle deg');
+    title('Pointing angle versus limit');
+    legend('Location','best');
+    
+    % Bottom: margin
+    nexttile; hold on; grid on;
+    plot(tTraj*T_ref, ThetaSim - phiSim, 'b-', 'LineWidth', 1.6, 'DisplayName','Margin = \Theta - \phi');
+    
+    xlabel('Time s'); ylabel('deg');
+    title('Pointing margin (positive means within limit)');
+    legend('Location','best');
 end
-
-figure('Name','Pointing vs Limit (Sim)'); tiledlayout(2,1);
-
-% Top: angles
-nexttile; hold on; grid on;
-plot(tTraj*T_ref, phiSim, 'b-', 'LineWidth', 1.6, 'DisplayName','\phi (Sim)');
-plot(tTraj*T_ref, ThetaSim, 'b--', 'LineWidth', 1.6, 'DisplayName','\Theta limit');
-if hasUC
-    plot(tTrajUC*T_ref, phiSimUC, 'r-', 'LineWidth', 1.2, 'DisplayName','\phi (Sim UC)');
-end
-xlabel('Time s'); ylabel('Angle deg');
-title('Pointing angle versus limit');
-legend('Location','best');
-
-% Bottom: margin
-nexttile; hold on; grid on;
-plot(tTraj*T_ref, ThetaSim - phiSim, 'b-', 'LineWidth', 1.6, 'DisplayName','Margin = \Theta - \phi');
-
-xlabel('Time s'); ylabel('deg');
-title('Pointing margin (positive means within limit)');
-legend('Location','best');
-
 else
     % Simulation data not available - only optimization plots were generated
     fprintf('\n=== NOTE: Simulation plots skipped (runSimulation = false) ===\n');
     fprintf('Only optimization-based plots have been generated.\n\n');
+end
+
+% Opt Param History for reOpt
+if ~isempty(optHistory) && exist('ICstates', 'var') && ~isempty(ICstates)
+    figure('Name', 'ReOpt Parameter History');
+    paramPlot = tiledlayout(5, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+    
+    % Extract data from optHistory table
+    t_elapsedND = table2array(optHistory(:,1));
+    x_opt = t_elapsedND .* refVals.T_ref;
+    gamma_hist = table2array(optHistory(:,2));
+    gamma2_hist = table2array(optHistory(:,3));
+    tgoSolved_ND = table2array(optHistory(:,5));
+    tgoSolved = tgoSolved_ND .* refVals.T_ref;
+    
+    % Extract IC states from table
+    ICstates_array = table2array(ICstates);
+    
+    % Calculate c1 and c2 at each re-optimization point
+    nPoints = size(optHistory, 1);
+    c1_norm = zeros(nPoints, 1);
+    c2_norm = zeros(nPoints, 1);
+    c1_components = zeros(nPoints, 3);
+    c2_components = zeros(nPoints, 3);
+    tgo_gamma1 = zeros(nPoints, 1);
+    tgo_gamma2 = zeros(nPoints, 1);
+    
+    rfStar = nonDimParams.rfStarND;
+    vfStar = nonDimParams.vfStarND;
+    afStar = nonDimParams.afStarND;
+    gConst = nonDimParams.gConst;
+    
+    for i = 1:nPoints
+        % Use saved IC states directly (no interpolation needed)
+        r_i = ICstates_array(i, 1:3)';
+        v_i = ICstates_array(i, 4:6)';
+        
+        % Calculate coefficients
+        [c1, c2] = calculateCoeffs(r_i, v_i, tgoSolved_ND(i), gamma_hist(i), gamma2_hist(i), afStar, rfStar, vfStar, gConst);
+        
+        c1_norm(i) = norm(c1);
+        c2_norm(i) = norm(c2);
+        c1_components(i, :) = c1(:)';
+        c2_components(i, :) = c2(:)';
+        
+        % Calculate tgo^gamma values
+        tgo_gamma1(i) = tgoSolved_ND(i)^gamma_hist(i);
+        tgo_gamma2(i) = tgoSolved_ND(i)^gamma2_hist(i);
+    end
+    
+    % Plot Gamma
+    nexttile;
+    plot(x_opt, gamma_hist, 'LineWidth', 2);
+    title('\gamma_1'); xlabel('Seconds'); ylabel('Value');
+    grid on;
+    
+    % Plot Gamma2
+    nexttile;
+    plot(x_opt, gamma2_hist, 'LineWidth', 2);
+    title('\gamma_2'); xlabel('Seconds'); ylabel('Value');
+    grid on;
+    
+    % Plot tgo Solved
+    nexttile;
+    plot(x_opt, tgoSolved, 'LineWidth', 2);
+    title('t_{go} Solved'); xlabel('Seconds'); ylabel('Seconds');
+    grid on;
+    
+    % Plot c1 norm
+    nexttile;
+    plot(x_opt, c1_norm, 'LineWidth', 2);
+    title('||c_1||'); xlabel('Seconds'); ylabel('Magnitude');
+    grid on;
+    
+    % Plot c2 norm
+    nexttile;
+    plot(x_opt, c2_norm, 'LineWidth', 2);
+    title('||c_2||'); xlabel('Seconds'); ylabel('Magnitude');
+    grid on;
+    
+    % Plot c1 components
+    nexttile;
+    hold on;
+    plot(x_opt, c1_components(:,1), 'r-', 'LineWidth', 1.5, 'DisplayName', 'c_{1,x}');
+    plot(x_opt, c1_components(:,2), 'g-', 'LineWidth', 1.5, 'DisplayName', 'c_{1,y}');
+    plot(x_opt, c1_components(:,3), 'b-', 'LineWidth', 1.5, 'DisplayName', 'c_{1,z}');
+    title('c_1 Components'); xlabel('Seconds'); ylabel('Value');
+    legend('Location', 'best');
+    grid on;
+    hold off;
+    
+    % Plot c2 components
+    nexttile;
+    hold on;
+    plot(x_opt, c2_components(:,1), 'r-', 'LineWidth', 1.5, 'DisplayName', 'c_{2,x}');
+    plot(x_opt, c2_components(:,2), 'g-', 'LineWidth', 1.5, 'DisplayName', 'c_{2,y}');
+    plot(x_opt, c2_components(:,3), 'b-', 'LineWidth', 1.5, 'DisplayName', 'c_{2,z}');
+    title('c_2 Components'); xlabel('Seconds'); ylabel('Value');
+    legend('Location', 'best');
+    grid on;
+    hold off;
+    
+    % Plot tgo^gamma1
+    nexttile;
+    plot(x_opt, tgo_gamma1, 'LineWidth', 2);
+    title('t_{go}^{\gamma_1}'); xlabel('Seconds'); ylabel('Value');
+    grid on;
+    
+    % Plot tgo^gamma2
+    nexttile;
+    plot(x_opt, tgo_gamma2, 'LineWidth', 2);
+    title('t_{go}^{\gamma_2}'); xlabel('Seconds'); ylabel('Value');
+    grid on;
+    
+    sgtitle('Optimization Parameters Through Reoptimization');
 end
 
 end

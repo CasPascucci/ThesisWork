@@ -35,26 +35,25 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
               0  0 -1];     % tgo >= 0.01
     bineq = [-optimizationParams.gamma1eps; -optimizationParams.gamma2eps; -0.01];
 
-    lb = [0, 0, 0.01];
+    lb = [optimizationParams.gamma1eps, 0, 0.01];
     ub = [5, 10, 11];
 
-        if dispersion || optimizationParams.updateOpt
-            fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
-            'FiniteDifferenceType','forward','MaxIterations', 1000, ...
-            'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
-            'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
-        else
-            fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
-            'FiniteDifferenceType','forward','MaxIterations', 1000, ...
-            'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
-            'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
-        end
+    if dispersion || optimizationParams.updateOpt
+        fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
+        'FiniteDifferenceType','forward','MaxIterations', 1000, ...
+        'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
+        'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
+    else
+        fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
+        'FiniteDifferenceType','forward','MaxIterations', 1000, ...
+        'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
+        'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
+    end
 
     nodeCount = optimizationParams.nodeCount;
 
     obj = @(params) objectiveFunction(params, betaParam, afStar, rfStar, r0, vfStar, v0, gConst, nonDimParams, optimizationParams);
-    nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals, rot_MCMF2ENU, r0_MCMF_ND);
-
+    nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals, rot_MCMF2ENU, r0_MCMF_ND, nonDimParams.m0ND);
     
     [optParams, optCost, exitflag, output] = fmincon(obj, paramsX0, Aineq, bineq, [], [], lb, ub, nonlincon, fminconOptions);
 
@@ -76,6 +75,18 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
         [maxViolation, idx] = max(c);
         fprintf('Max violation: %.3f at constraint %d\n', maxViolation, idx);
     end
+
+    if exitflag <= 0
+            fprintf('\n=== DIAGNOSTIC: Optimization Failed (exitflag=%d) ===\n', exitflag);
+            fprintf('Params: gamma=%.4f, gamma2=%.4f, tgo=%.4f\n', optParams(1), optParams(2), optParams(3));
+            [c, ~] = nonlincon(optParams);
+            violated = find(c > 1e-6);
+            fprintf('Violated constraints (%d total):\n', length(violated));
+            for vi = 1:min(10, length(violated))
+                fprintf('  c(%d) = %.4f\n', violated(vi), c(violated(vi)));
+            end
+            fprintf('Max violation: c(%d) = %.6f\n', find(c==max(c),1), max(c));
+        end
 
     
 
@@ -141,14 +152,13 @@ function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, 
 
 end
 
-function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals, rot_MCMF2ENU, r0_MCMF_ND)
+function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals, rot_MCMF2ENU, r0_MCMF_ND, m0)
     nodeCount = optimizationParams.nodeCount;
     glideSlopeFlag = optimizationParams.glideSlopeEnabled;
     pointingFlag = optimizationParams.pointingEnabled;
     gamma1  = params(1);
     gamma2     = params(2);
     tgo0   = params(3);
-    m0 = 1;
 
     [c1, c2] = calculateCoeffs(r0, v0, tgo0, gamma1, gamma2, afStar, rfStar, vfStar, gConst);
     tgospan = linspace(0,tgo0,nodeCount);

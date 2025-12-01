@@ -99,6 +99,7 @@ minTime = 0.2/refVals.T_ref;
 
         t_elapsed = tSeg(end);
     
+        % Decrement TGO naturally
         tgo = tgo - t_segment;
     
         if verboseOutput
@@ -123,38 +124,46 @@ minTime = 0.2/refVals.T_ref;
             fprintf('\nRe-optimizing at t=%.2f s (tgo=%.2f s)...\n', t_elapsed * refVals.T_ref, tgo * refVals.T_ref);
         end
         
-        % Scale node count proportional to tgo
-        newNodeCount = ceil(initialNodeCount * (tgo / tgo0));
-        % Ensure odd number
-        if mod(newNodeCount, 2) == 0
-            newNodeCount = newNodeCount + 1;
-        end
-
-        optimizationParams.nodeCount = newNodeCount;
-
-        if verboseOutput
-            fprintf('Scaled node count to: %d\n', optimizationParams.nodeCount);
-        end
+        % desiredNodes = ceil(initialNodeCount * (tgo / tgo0));
+        % minNodesForAccuracy = max(50, ceil(0.3 * initialNodeCount)); % At least 30% of original
+        % newNodeCount = max(minNodesForAccuracy, desiredNodes);
+        % 
+        % % Ensure odd number for Simpson's rule
+        % if mod(newNodeCount, 2) == 0
+        %     newNodeCount = newNodeCount + 1;
+        % end
+        % 
+        % optimizationParams.nodeCount = newNodeCount;
+        
+        %optimizationParams.lockTgo = true;
+        % 
+        % if verboseOutput
+        %     fprintf('Scaled node count to: %d (Clamped min 50)\n', optimizationParams.nodeCount);
+        % end
 
         [optParams, ~, ~, ~, ~, ~, exitflag] = optimizationLoop(paramsX0, betaParam, ...
             problemParams, newNonDimParams, optimizationParams, refVals, delta_t, false, false);
-
         if exitflag > 0
-            % Check for unreasonable jumps
-            gamma_change = abs(optParams(1) - gamma);
-            if gamma_change > 0.5  % More than 30% change
-                fprintf('WARNING: Large gamma jump (%.4f -> %.4f). Rejecting.\n', gamma, optParams(1));
-                % Don't update parameters
-            else
+            % % Check for unreasonable jumps in BOTH parameters
+            % gamma_change = abs(optParams(1) - gamma);
+            % gamma2_change = abs(optParams(2) - gamma2);
+            % 
+            % % If either parameter jumps by more than 0.4, reject the solution
+            % if gamma_change > 0.4 || gamma2_change > 0.4
+            %     fprintf('WARNING: Large parameter jump detected (gamma: %.4f->%.4f, gamma2: %.4f->%.4f). Rejecting.\n', ...
+            %         gamma, optParams(1), gamma2, optParams(2));
+            %     % Keep previous parameters (gamma, gamma2, kr).
+            %     % tgo was already naturally decremented above.
+            % else
                 gamma = optParams(1);
                 gamma2 = optParams(2);
                 kr = (gamma2+2)*(gamma+2);
                 tgo = optParams(3);
-            end
+            % end
         else
-            % Keep previous parameters if optimization failed
+            % OPTIMIZATION FAILED
             if verboseOutput
-                fprintf('WARNING: Optimization failed (exitflag=%d). Keeping previous parameters.\n', exitflag);
+                fprintf('WARNING: Optimization failed (exitflag=%d). Keeping previous parameters and natural tgo.\n', exitflag);
             end
         end
         
@@ -162,7 +171,7 @@ minTime = 0.2/refVals.T_ref;
         exitFlags = [exitFlags; exitflag];
         
         if verboseOutput
-            fprintf('New parameters: gamma=%.4f, gamma2=%.4f, kr=%.4f, tgo=%.2f s (exitflag=%d)\n\n', ...
+            fprintf('Active parameters: gamma=%.4f, gamma2=%.4f, kr=%.4f, tgo=%.2f s (exitflag=%d)\n\n', ...
                 gamma, gamma2, kr, tgo * refVals.T_ref, exitflag);
         end
     end
@@ -177,9 +186,7 @@ minTime = 0.2/refVals.T_ref;
         
         t_start = t_elapsed;
 
-        
-        
-        t_freeze = t_elapsed + (tgo -minTime)
+        t_freeze = t_elapsed + (tgo -minTime);
         t_end = t_elapsed + tgo;
         [tSeg1, stateSeg1] = ode45(@(t, X) trajectorySegmentODE(t, X, t_elapsed, gamma, kr, tgo, ...
         isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
