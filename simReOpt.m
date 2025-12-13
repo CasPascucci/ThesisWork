@@ -2,7 +2,7 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, ICstates,
 
 kr0 = (gamma20+2)*(gamma0+2);
 
-initialNodeCount = optimizationParams.nodeCount;
+%initialNodeCount = optimizationParams.nodeCount;
 
 % Original IC's
 r0 = nonDimParams.r0ND;

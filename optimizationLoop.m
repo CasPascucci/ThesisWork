@@ -1,7 +1,4 @@
 function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_t, verboseOutput, dispersion)
-    if nargin < 9
-        dispersion = false;
-    end
 
     % Some Tweakable Parameters / Defaults
     if optimizationParams.gamma1eps < 0
@@ -38,17 +35,10 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     lb = [optimizationParams.gamma1eps, 0, 0.01];
     ub = [5, 10, 11];
 
-    if dispersion || optimizationParams.updateOpt
-        fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
-        'FiniteDifferenceType','forward','MaxIterations', 1000, ...
-        'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
-        'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
-    else
-        fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
-        'FiniteDifferenceType','forward','MaxIterations', 1000, ...
-        'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
-        'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
-    end
+    fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
+    'FiniteDifferenceType','forward','MaxIterations', 1000, ...
+    'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
+    'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
 
     nodeCount = optimizationParams.nodeCount;
 

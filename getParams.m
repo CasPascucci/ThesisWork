@@ -1,20 +1,9 @@
 function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals] = ...
     getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation)
-% GETPARAMS Orchestrates the optimization and simulation pipeline.
-%   Prepares data, runs the primary optimization, generates comparison data
-%   (either Static Baseline or Unconstrained), runs the primary simulation
-%   (Constrained or Re-Optimized), and triggers plotting.
 
     addpath([pwd, '/CoordinateFunctions']);
 
     %% 1. Initialization & Defaults
-    if nargin < 9
-        dispersion = false;
-        runSimulation = true;
-    end
-    if nargin < 10
-        runSimulation = true;
-    end
 
     % Planetary Constants
     rPlanet = planetaryParams.rPlanet;
@@ -132,7 +121,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
 
     if needsSecondary
         if reopt
-            % Mode A: Re-Opt is Enabled. 
+            % Mode 1: Re-Opt is Enabled. 
             % Secondary Data = Static Baseline (Same params, no updates).
             if verboseOutput; fprintf("\nGenerating Static Baseline for Comparison...\n"); end
             
@@ -147,7 +136,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
                 closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
                 
         else
-            % Mode B: Re-Opt is Disabled (Single Run).
+            % Mode 2: Re-Opt is Disabled (Single Run).
             % Secondary Data = Unconstrained Optimization (No glideslope/pointing).
             if verboseOutput; fprintf("Generating Unconstrained Trajectory for Comparison...\n"); end
             
@@ -173,7 +162,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
                               'flag_thrustGotLimited', flag_thrustGotLimitedSec);
     end
 
-    %% 6. Primary Simulation Execution
+    %% 6. Simulation
     tTraj = [];
     stateTraj = [];
     aTSim = [];
@@ -207,7 +196,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, true);
     end
 
-    %% 7. Visualization
+    %% 7. Plotting
     if doPlots
         plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, ...
             refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, ...

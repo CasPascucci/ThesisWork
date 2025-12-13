@@ -1,18 +1,16 @@
 function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, secondaryData, optHistory, ICstates)
-% PLOTTING Visualizes trajectory optimization and simulation results.
-%   Generates figures comparing the primary run (Initial Plan + Simulation)
-%   against a secondary baseline (Comparison Plan + Simulation).
 
-    %% 1. Configuration & Data Processing
+
+    %% Preprocess
     
     % Determine plotting mode
     isReOpt = optimParams.updateOpt;
     if isReOpt
+        % Reopt vs Static Mode
         labelMainSim = 'Re-Optimized Flight';
         labelSecSim  = 'Static Baseline Flight';
         
         labelMainOpt = 'Initial Plan'; 
-        % In Re-Opt, the "Secondary" plan is identical to the "Main" plan at t=0.
         plotSecondaryOptim = false; 
         
         titleSuffixSim  = ' (Re-Opt vs Static)';
@@ -79,7 +77,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         aT_norm_ENU = vecnorm(aT_ENU,2,2);
     end
     
-    % Process Secondary Data (if available)
+    % Process Secondary Data
     hasSec = exist('secondaryData','var') && ~isempty(secondaryData);
     if hasSec
         tTrajSec = secondaryData.tTraj;
@@ -109,7 +107,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     maxThrustDim = problemParams.maxThrustDim;
     minThrustDim = problemParams.minThrustDim;
 
-    %% 2. Optimization Results Figures (Planned Trajectories)
+    %% Optimization Figures
     nodeCount = optimParams.nodeCount;
     aTOptim = aTOptim';
     rdOptim = rdOptim';
@@ -131,10 +129,8 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     figure('Name',"Optim Throttle"); hold on;
     thrustDim = aTNormOpt .* mOptim *(refVals.M_ref*refVals.A_ref);
     
-    % Plot Main (Blue Solid)
     plot(tspanOpt(2:end)*T_ref, thrustDim(2:end)/problemParams.maxThrustDim, 'b-', 'LineWidth', 1.5, 'DisplayName', labelMainOpt);
     
-    % Plot Secondary (Red Dashed) - Only if enabled (Constrained vs Unconstrained)
     if plotSecondaryOptim && hasSec && isfield(secondaryData,'aTOptim') && ~isempty(secondaryData.aTOptim) ...
          && isfield(secondaryData,'mOptim')  && ~isempty(secondaryData.mOptim)
 
@@ -191,10 +187,8 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     legend('Location','best');
     
     % Figure: Optimization 3D Trajectory
-    % Filter data to relevant plotting volume (Final 3km) to match cone scaling
-    UPlotMax = 3000; % Filter threshold
+    UPlotMax = 3000; % Alt filter threshold
     
-    % Interpolate high-res for smooth plotting
     t_nodes = linspace(0, tgo0, nodeCount);
     t_highres = linspace(0, tgo0, 2000); 
     
@@ -238,7 +232,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     
     figure('Name','Opt 3D'); hold on; grid on; axis equal;
     
-    % Main Trajectory (Blue Solid with Dots)
+    % Main Trajectory
     plot3(ETraj_Plot/1000, NTraj_Plot/1000, UTraj_Plot/1000, 'b.-', 'LineWidth', 2, 'MarkerSize',5, 'DisplayName', labelMainOpt);
     
     surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8, 'HandleVisibility','off');
@@ -372,9 +366,9 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     xlabel('Time s'); ylabel('Accel m/s^2'); title(['Planned Accel Profile (MCMF)' titleSuffixOpt]);
     grid on;
 
-    %% 3. Simulation Results Figures (Flown Trajectories)
+    %% Simulation Figures
     if hasSimData
-        % Figure: 3D Trajectory (Simulation)
+        % Figure: 3D Trajectory
         idx2km = find(alt_m <= 2000, 1, 'first');
         if isempty(idx2km)
             NtotalSim = numel(alt_m);
@@ -434,7 +428,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         zlim([0, 2]); xlim([-3,3]); ylim([-3,3]); axis square;
         legend('Location','bestoutside');
 
-        % Figure: Range vs Altitude (Simulation)
+        % Figure: Range vs Altitude
         rhat      = rDim ./ vecnorm(rDim,2,2);
         central   = acos(rhat*U0);
         arcLength = rMoon * central;
@@ -453,7 +447,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         title(['Range vs Altitude (Sim)' titleSuffixSim]); grid on;
         legend('Location','best');
 
-        % Figure: TOPO Acceleration (Simulation)
+        % Figure: TOPO Acceleration
         figure('Name','Sim TOPO Accel'); hold on;
         plot(tTraj*T_ref, aE, 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' East']);
         plot(tTraj*T_ref, aN, 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' North']);
@@ -471,7 +465,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         xlabel('Time s'); ylabel('Accel m/s^2'); title(['Commanded Accel Profile (TOPO)' titleSuffixSim]);
         grid on;
 
-        % Figure: MCMF Acceleration (Simulation)
+        % Figure: MCMF Acceleration
         figure('Name','Sim MCMF Accel'); hold on;
         plot(tTraj*T_ref, aTDim(1,:), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' X']);
         plot(tTraj*T_ref, aTDim(2,:), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Y']);
@@ -489,7 +483,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         end
         grid on;
 
-        % Figure: Velocity Profile (Simulation)
+        % Figure: Velocity Profile
         figure('Name','Sim Vel'); hold on;
         plot(tTraj*T_ref, vE, 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' East']);
         plot(tTraj*T_ref, vN, 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' North']);
@@ -504,7 +498,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         xlabel('Time s'); ylabel('Velocity m/s'); title(['Velocity Profile (Dim)' titleSuffixSim]);
         grid on;
         
-        % Figure: Throttle Profile (Simulation)
+        % Figure: Throttle Profile
         figure('Name','Sim Throttle'); hold on;
         thrustDim = aTDimNorm' .* mDim;
         plot(tTraj*T_ref, thrustDim/maxThrustDim, 'b-', 'DisplayName', labelMainSim);
@@ -555,7 +549,6 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             
             phi0_deg   = optimParams.minPointing;
             
-            % FIXED: Calculate Tgo based on Actual Landing Time
             tgoSim = (tTraj(end) - tTraj) * T_ref; 
             phiA_deg = 0.5 * (optimParams.maxTiltAccel) .* (tgoSim.^2);
             ThetaSim = min(180, phi0_deg + phiA_deg);
@@ -626,7 +619,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             c2_norm(i) = norm(c2);
         end
         
-        % NEW: Append final point to extend lines to end of flight
+        % Continue curve through static time at end of flight
         if hasSimData
             tFinal = tTraj(end) * refVals.T_ref;
             x_opt = [x_opt; tFinal];
