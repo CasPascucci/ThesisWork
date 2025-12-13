@@ -107,6 +107,11 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
 
     [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
         optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
+    if exitflag ~= 1
+        fprintf("\n First Optimization Converged to flag ~=2, rerunning optimization starting from first rounds parameters:\n");
+        [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
+        optimizationLoop(optParams, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
+    end
 
     gammaOpt = optParams(1);
     gamma2Opt = optParams(2);
