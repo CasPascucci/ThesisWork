@@ -59,20 +59,19 @@ optimizationParams.gamma1eps = 1e-2;
 optimizationParams.gamma2eps = 1e-2;
 
 % Divert
-targetState.divertEnabled = true; % Also requires reopt to be enabled to truly work
-divertDistances = [100, 250, 500, 1000];
-divert1x = divertDistances';
-divert1y = zeros(length(divertDistances),1);
-divert2x = zeros(length(divertDistances),1);
-divert2y = divertDistances';
-divert3x = [divertDistances.*cosd(45)]';
-divert3y = divert3x;
-targetState.divertPoints = [divert1x, divert1y, zeros(length(divertDistances),1);
-                            divert2x, divert2y, zeros(length(divertDistances),1);
-                            divert3x, divert3y, zeros(length(divertDistances),1)];
-targetState.divertPoints = [-300, -300, 0];
-
-targetState.altDivert = 1000; % m
+targetState.divertEnabled = false; % Also requires reopt to be enabled to truly work
+% divertDistances = [100, 250, 500, 1000];
+% divert1x = divertDistances';
+% divert1y = zeros(length(divertDistances),1);
+% divert2x = zeros(length(divertDistances),1);
+% divert2y = divertDistances';
+% divert3x = [divertDistances.*cosd(45)]';
+% divert3y = divert3x;
+% targetState.divertPoints = [divert1x, divert1y, zeros(length(divertDistances),1);
+%                             divert2x, divert2y, zeros(length(divertDistances),1);
+%                             divert3x, divert3y, zeros(length(divertDistances),1)];
+targetState.divertPoints = [-300, -300, 0]; % m % Single case, above block is multiple divert plots
+targetState.altDivert = 2000; % m
 
 %% 3. Execution Flags & Run
 beta          = 0.3;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
