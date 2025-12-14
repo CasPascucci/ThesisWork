@@ -314,17 +314,12 @@ function dXdt = trajectoryFrozenThrust(t, X, aT_frozen, isp, rMoonND)
     v = X(4:6);
     m = X(7);
     
-    % Gravitational acceleration
     g = -(rMoonND^2) * r / (norm(r)^3);
-    
-    % Use frozen thrust acceleration
     aT = aT_frozen;
-    
-    % Thrust magnitude and mass flow rate
+
     F_mag = norm(aT) * m;
     dm_dt = -F_mag / isp;
-    
-    % State derivatives
+
     dXdt = [v; aT + g; dm_dt];
 end
 
