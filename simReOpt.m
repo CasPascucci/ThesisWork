@@ -93,7 +93,7 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT impl
             [tSeg, stateSeg] = ode45(@(t, X) trajectorySegmentODE(t, X, t_elapsed, gamma, kr, tgo, ...
                 isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
                 [t_start, t_end], X0, odeoptions);
-            tEvent = []; stateEvent = []; iEvent = []
+            tEvent = []; stateEvent = []; iEvent = [];
         end
 
         if ~isempty(tEvent)
