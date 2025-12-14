@@ -189,44 +189,6 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     idx = idx + nodeCount;
     c(idx:idx+nodeCount-1) = lower(:);
     idx = idx + nodeCount;
-
-    % if glideSlopeFlag % make it sparse?
-    %     glideHigh = optimizationParams.glideSlopeHigh;
-    %     glideLow = optimizationParams.glideSlopeLow;
-    %     glideCut = optimizationParams.glideSlopeCutoff;
-    %     finalTheta = optimizationParams.glideSlopeFinalTheta;
-    %     cutoffAlt = tand(finalTheta) * glideCut;
-    %     phi1hat = (tgospan.^(gamma1+2))./((gamma1+1)*(gamma1+2));
-    %     phi2hat = (tgospan.^(gamma2+2))./((gamma2+1)*(gamma2+2));
-    %     rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospan + 0.5*(gConst+afStar).*tgospan.^2;
-    %     rdOptimTOPO = MCMF2ENU(rdOptim,problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
-    %     rMoon = problemParams.rMoon;
-    %     rdOptimDim = rdOptim*refVals.L_ref;
-    %     alt_opt = vecnorm(rdOptimDim,2,1) - rMoon;
-    % 
-    %     theta = zeros(1,nodeCount);
-    % 
-    %     mask_high = alt_opt > glideHigh; % Points above the constraint, theta = 90
-    %     theta(mask_high) = 180;
-    % 
-    %     mask_mid = (alt_opt <= glideHigh) & (alt_opt >= glideLow);
-    %     frac = (alt_opt(mask_mid) - glideLow) / (glideHigh-glideLow);
-    %     theta(mask_mid) = finalTheta + (frac.*(90-finalTheta));
-    % 
-    %     mask_low = (alt_opt < glideLow) & (alt_opt >= cutoffAlt);
-    %     theta(mask_low) = finalTheta;
-    % 
-    %     mask_free = alt_opt < cutoffAlt;
-    %     theta(mask_free) = 90;
-    % 
-    %     rUnitVec = rdOptimTOPO./ max(vecnorm(rdOptimTOPO,2,1),1e-10);
-    %     vertUnitVec = [0;0;1];
-    %     dotProducts = rUnitVec' * vertUnitVec;
-    %     cGlide = cosd(theta)' - dotProducts;
-    %     c = [c;cGlide];
-    % end
-
-    % 
     if glideSlopeFlag
         glideNodes = floor(nodeCount*0.15);
         freeGlideNodes = floor(nodeCount*0.01) + 1;

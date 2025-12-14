@@ -1,8 +1,9 @@
-function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = simReOpt(gamma0,gamma20,tgo0, problemParams, nonDimParams, refVals, delta_t, optimizationParams, betaParam, verboseOutput)
+function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = simReOpt(gamma0,gamma20,tgo0, problemParams, nonDimParams, refVals, delta_t, optimizationParams, betaParam, verboseOutput, divertPoint)
 
-kr0 = (gamma20+2)*(gamma0+2);
+if nargin < 11
+    divertPoint = [];
+end
 
-%initialNodeCount = optimizationParams.nodeCount;
 
 % Original IC's
 r0 = nonDimParams.r0ND;
@@ -20,8 +21,19 @@ X0 = [r0; v0; m0];
 updateFreqND = optimizationParams.updateFreq / refVals.T_ref;
 updateStopND = optimizationParams.updateStop / refVals.T_ref;
 
-
+% Check if doing Divert
+divertEnabled = problemParams.divertEnabled;
+divertOccured = false;
+if divertEnabled
+    altDivertND = problemParams.altDivert /refVals.L_ref;
+    eventDivert = @(t,y) divertTrigger(t, y, nonDimParams.rMoonND, altDivertND);
+    
+else
+    odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
+end
 % Setup Results
+kr0 = (gamma20+2)*(gamma0+2);
+
 t_elapsed = 0;
 gamma = gamma0;
 gamma2 = gamma20;
@@ -39,7 +51,7 @@ optHistory = [t_elapsed, gamma, gamma2, kr, tgo];
 exitFlags = [];
 exitFlags(1) = 99;
 
-odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
+
 
 if verboseOutput
     fprintf('\n=== Starting Re-Optimization Simulation ===\n');
@@ -50,10 +62,10 @@ if verboseOutput
     fprintf('==========================================\n\n');
 end
 segmentCount = 0;
-minTime = 0.2/refVals.T_ref;
+minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT implemented
 
 % Main loop
-    while tgo > updateStopND
+    while tgo > updateStopND % keep looping until update stop time
         segmentCount = segmentCount + 1;
         tgo_remaining = tgo - updateStopND;
         t_segment = min(tgo,min(updateFreqND, tgo_remaining));
@@ -71,10 +83,28 @@ minTime = 0.2/refVals.T_ref;
             fprintf('Tgo at start: %.2f s\n', tgo * refVals.T_ref);
             fprintf('Current params: gamma=%.4f, gamma2=%.4f, kr=%.4f\n', gamma, gamma2, kr);
         end
-    
-        [tSeg, stateSeg] = ode45(@(t, X) trajectorySegmentODE(t, X, t_elapsed, gamma, kr, tgo, ...
-            isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
-            [t_start, t_end], X0, odeoptions);
+        if divertEnabled && ~divertOccured
+            odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6, 'Events', eventDivert);
+            [tSeg, stateSeg, tEvent, stateEvent, iEvent] = ode45(@(t, X) trajectorySegmentODE(t, X, t_elapsed, gamma, kr, tgo, ...
+                isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
+                [t_start, t_end], X0, odeoptions);
+        else
+            odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
+            [tSeg, stateSeg] = ode45(@(t, X) trajectorySegmentODE(t, X, t_elapsed, gamma, kr, tgo, ...
+                isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
+                [t_start, t_end], X0, odeoptions);
+            tEvent = []; stateEvent = []; iEvent = []
+        end
+
+        if ~isempty(tEvent)
+            if verboseOutput
+                fprintf('>> DIVERT TRIGGERED at t=%.2f s (Alt < %.2f m)\n', tEvent(end)*refVals.T_ref, problemParams.altDivert);
+            end
+            rfStar = divertPoint;
+            nonDimParams.rfStarND = divertPoint;
+            
+            divertHasOccurred = true;
+        end
     
         tTraj = [tTraj;tSeg];
         stateTraj = [stateTraj;stateSeg];
@@ -112,7 +142,7 @@ minTime = 0.2/refVals.T_ref;
             break;
         end
     
-    
+
         newNonDimParams = nonDimParams;
         newNonDimParams.r0ND = X0(1:3);
         newNonDimParams.v0ND = X0(4:6);
@@ -123,43 +153,14 @@ minTime = 0.2/refVals.T_ref;
         if verboseOutput
             fprintf('\nRe-optimizing at t=%.2f s (tgo=%.2f s)...\n', t_elapsed * refVals.T_ref, tgo * refVals.T_ref);
         end
-        
-        % desiredNodes = ceil(initialNodeCount * (tgo / tgo0));
-        % minNodesForAccuracy = max(50, ceil(0.3 * initialNodeCount)); % At least 30% of original
-        % newNodeCount = max(minNodesForAccuracy, desiredNodes);
-        % 
-        % % Ensure odd number for Simpson's rule
-        % if mod(newNodeCount, 2) == 0
-        %     newNodeCount = newNodeCount + 1;
-        % end
-        % 
-        % optimizationParams.nodeCount = newNodeCount;
-        
-        %optimizationParams.lockTgo = true;
-        % 
-        % if verboseOutput
-        %     fprintf('Scaled node count to: %d (Clamped min 50)\n', optimizationParams.nodeCount);
-        % end
 
         [optParams, ~, ~, ~, ~, ~, exitflag] = optimizationLoop(paramsX0, betaParam, ...
             problemParams, newNonDimParams, optimizationParams, refVals, delta_t, false, false);
         if exitflag > 0
-            % % Check for unreasonable jumps in BOTH parameters
-            % gamma_change = abs(optParams(1) - gamma);
-            % gamma2_change = abs(optParams(2) - gamma2);
-            % 
-            % % If either parameter jumps by more than 0.4, reject the solution
-            % if gamma_change > 0.4 || gamma2_change > 0.4
-            %     fprintf('WARNING: Large parameter jump detected (gamma: %.4f->%.4f, gamma2: %.4f->%.4f). Rejecting.\n', ...
-            %         gamma, optParams(1), gamma2, optParams(2));
-            %     % Keep previous parameters (gamma, gamma2, kr).
-            %     % tgo was already naturally decremented above.
-            % else
-                gamma = optParams(1);
-                gamma2 = optParams(2);
-                kr = (gamma2+2)*(gamma+2);
-                tgo = optParams(3);
-            % end
+            gamma = optParams(1);
+            gamma2 = optParams(2);
+            kr = (gamma2+2)*(gamma+2);
+            tgo = optParams(3);
         else
             % OPTIMIZATION FAILED
             if verboseOutput
@@ -176,7 +177,7 @@ minTime = 0.2/refVals.T_ref;
         end
     end
     
-    if tgo > 0
+    if tgo > 0 % safety check if there is time to do final segment
         segmentCount = segmentCount + 1;
         
         if verboseOutput
@@ -192,7 +193,7 @@ minTime = 0.2/refVals.T_ref;
         isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
         [t_start, t_freeze], X0, odeoptions);
     
-        % Compute final thrust acceleration to freeze
+        % Compute final thrust acceleration to freeze after minTime
         r_freeze = stateSeg1(end, 1:3)';
         v_freeze = stateSeg1(end, 4:6)';
         m_freeze = stateSeg1(end, 7);
@@ -325,4 +326,12 @@ function dXdt = trajectoryFrozenThrust(t, X, aT_frozen, isp, rMoonND)
     
     % State derivatives
     dXdt = [v; aT + g; dm_dt];
+end
+
+function [value, isterminal, direction] = divertTrigger(~, y, rMoonND, altDivertND)
+    r = y(1:3);
+    currentAlt = norm(r) - rMoonND;
+    value = currentAlt - altDivertND;
+    isterminal = 1;
+    direction = -1;
 end

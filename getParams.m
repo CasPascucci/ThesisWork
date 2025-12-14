@@ -31,6 +31,9 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     vfLanding          = targetState.vfLanding;
     afLanding          = targetState.afLanding;
     delta_t            = targetState.delta_t;
+    divertEnabled      = targetState.divertEnabled & optimizationParams.updateOpt;
+    altDivert          = targetState.altDivert;
+    divertPoints       = targetState.divertPoints;
 
     massInit           = vehicleParams.massInit;
     dryMass            = vehicleParams.dryMass;
@@ -78,6 +81,9 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     problemParams.minThrustDim = minThrust; 
     problemParams.landingLatDeg = landingLatDeg;
     problemParams.landingLonDeg = landingLonDeg;
+    problemParams.divertEnabled = divertEnabled;
+    problemParams.altDivert = altDivert;
+    problemParams.divertPoints = divertPoints;
 
     refVals = struct;
     refVals.L_ref = L_ref;
@@ -184,9 +190,18 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
             [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = ...
                 closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
         else
-            % Re-Optimization Simulation
-            [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
-                simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
+            if divertEnabled
+                for idx = 1:size(problemParams.divertPoints, 1)
+                    divertPoint = problemParams.divertPoints(idx,:)' ./ refVals.L_ref;
+                    divertPoint = ENU2MCMF(divertPoint, landingLatDeg, landingLonDeg, true);
+                    [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
+                    simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput, divertPoint);
+                end
+            else
+                % Re-Optimization Simulation
+                [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
+                    simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
+            end
             
             % Format History Output
             if ~isempty(optHistory)
