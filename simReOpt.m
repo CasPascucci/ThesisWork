@@ -172,7 +172,7 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT impl
         exitFlags = [exitFlags; exitflag];
         
         if verboseOutput
-            fprintf('Active parameters: gamma=%.4f, gamma2=%.4f, kr=%.4f, tgo=%.2f s (exitflag=%d)\n\n', ...
+            fprintf('New parameters: gamma=%.4f, gamma2=%.4f, kr=%.4f, tgo=%.2f s (exitflag=%d)\n\n', ...
                 gamma, gamma2, kr, tgo * refVals.T_ref, exitflag);
         end
     end
@@ -243,7 +243,7 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT impl
         fprintf('Total segments: %d\n', segmentCount);
         fprintf('Re-optimizations: %d\n', size(optHistory, 1) - 1);
         fprintf('Thrust limited: %s\n', string(flag_thrustGotLimited));
-        fprintf('===========================\n\n');
+        fprintf('===========================\n');
     end
 end
 

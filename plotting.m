@@ -629,12 +629,17 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             c1_norm = [c1_norm; c1_norm(end)];
             c2_norm = [c2_norm; c2_norm(end)];
         end
+
+        tgoInitial = tgoSolved(1);
+        tgoStaticAtUpdate = tgoInitial - x_opt;
+        tgoDiff = tgoStaticAtUpdate - tgoSolved;
         
-        nexttile; plot(x_opt, gamma_hist, 'LineWidth', 2); title('\gamma_1'); grid on;
-        nexttile; plot(x_opt, gamma2_hist, 'LineWidth', 2); title('\gamma_2'); grid on;
-        nexttile; plot(x_opt, tgoSolved, 'LineWidth', 2); title('t_{go} Solved'); grid on;
-        nexttile; plot(x_opt, c1_norm, 'LineWidth', 2); title('||c_1||'); grid on;
-        nexttile; plot(x_opt, c2_norm, 'LineWidth', 2); title('||c_2||'); grid on;
+        nexttile; plot(x_opt, gamma_hist, 'LineWidth', 2); title('\gamma_1'); grid on; xlabel('Time s');
+        nexttile; plot(x_opt, gamma2_hist, 'LineWidth', 2); title('\gamma_2'); grid on; xlabel('Time s');
+        nexttile; plot(x_opt, tgoSolved, 'LineWidth', 2); title('t_{go} Solved'); grid on; xlabel('Time s');
+        nexttile; plot(x_opt, c1_norm, 'LineWidth', 2); title('||c_1||'); grid on; xlabel('Time s');
+        nexttile; plot(x_opt, c2_norm, 'LineWidth', 2); title('||c_2||'); grid on; xlabel('Time s');
+        nexttile; stairs(x_opt, tgoDiff, 'LineWidth', 2); title('\Delta t_{go} (Static - ReOpt)'); ylabel('s'); xlabel('Time s'); grid on;
         
         sgtitle('Optimization Parameters Through Reoptimization');
     end

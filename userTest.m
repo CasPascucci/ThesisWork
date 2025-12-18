@@ -45,7 +45,7 @@ optimizationParams.glideSlopeLow        = 250; % m
 optimizationParams.glideSlopeCutoff     = 50;  % m
 
 % Pointing Constraints
-optimizationParams.pointingEnabled = true;
+optimizationParams.pointingEnabled = false;
 optimizationParams.maxTiltAccel    = 2;  % deg/s^2
 optimizationParams.minPointing     = 10; % deg
 
@@ -60,31 +60,31 @@ optimizationParams.gamma2eps = 1e-2;
 
 % Divert
 targetState.divertEnabled = false; % Also requires reopt to be enabled to truly work
-% divertDistances = [100, 250, 500, 1000];
-% divert1x = divertDistances';
-% divert1y = zeros(length(divertDistances),1);
-% divert2x = zeros(length(divertDistances),1);
-% divert2y = divertDistances';
-% divert3x = [divertDistances.*cosd(45)]';
-% divert3y = divert3x;
-% targetState.divertPoints = [divert1x, divert1y, zeros(length(divertDistances),1);
-%                             divert2x, divert2y, zeros(length(divertDistances),1);
-%                             divert3x, divert3y, zeros(length(divertDistances),1)];
-targetState.divertPoints = [-300, -300, 0]; % m % Single case, above block is multiple divert plots
+% divertDistances = [0, 50, 100, 150, 200, 300];
+% divert1E = divertDistances';
+% divert1N = zeros(length(divertDistances),1);
+% divert2E = zeros(length(divertDistances),1);
+% divert2N = divertDistances';
+% divert3E = [divertDistances.*cosd(45)]';
+% divert3N = divert3E;
+% targetState.divertPoints = [divert1E, divert1N, zeros(length(divertDistances),1);
+%                             divert2E, divert2N, zeros(length(divertDistances),1);
+%                             divert3E, divert3N, zeros(length(divertDistances),1)];
+targetState.divertPoints = [-150, -300, 0]; % m % Single case, above block is multiple divert plots
 targetState.altDivert = 2000; % m
 
 %% 3. Execution Flags & Run
-beta          = 0.3;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta          = 0.8;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 runSimulation = true;
 doPlotting    = true; 
 verboseOutput = true;
 
-tic
+%tic
 [gammaOpt, gamma2Opt, krOpt, tgoOptSec, ~, ~, optFuelCost, simFuelCost, ...
  aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, ...
  nonDimParams, refVals] = getParams(PDIState, planetaryParams, targetState, ...
     vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
-toc
+%toc
 
 %% 4. Results Display
 if optimizationParams.updateOpt

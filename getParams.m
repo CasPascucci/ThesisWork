@@ -114,7 +114,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
         optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
     if exitflag ~= 1
-        fprintf("\n First Optimization Converged to flag ~=2, rerunning optimization starting from first rounds parameters:\n");
+        fprintf("\n First Optimization Converged to flag ~=1, rerunning optimization starting from first rounds parameters:\n");
         [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
         optimizationLoop(optParams, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
     end
@@ -134,7 +134,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         if reopt
             % Mode 1: Re-Opt is Enabled. 
             % Secondary Data = Static Baseline (Same params, no updates).
-            if verboseOutput; fprintf("\nGenerating Static Baseline for Comparison...\n"); end
+            if verboseOutput; fprintf("\nStatic Trajectory\n"); end
             
             optParamsSec = optParams;
             optCostSec   = optCost;
@@ -149,7 +149,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         else
             % Mode 2: Re-Opt is Disabled (Single Run).
             % Secondary Data = Unconstrained Optimization (No glideslope/pointing).
-            if verboseOutput; fprintf("Generating Unconstrained Trajectory for Comparison...\n"); end
+            if verboseOutput; fprintf("Unconstrained Trajectory\n"); end
             
             optimizationParamsUC = optimizationParams;
             optimizationParamsUC.glideSlopeEnabled = false;
@@ -190,12 +190,14 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
             [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = ...
                 closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
         else
-            if divertEnabled
+            divertTrajectories = cell(1,size(problemParams.divertPoints, 1));
+            if divertEnabled % Re-Optimization with Divert
                 for idx = 1:size(problemParams.divertPoints, 1)
                     divertPoint = problemParams.divertPoints(idx,:)' ./ refVals.L_ref;
                     divertPoint = ENU2MCMF(divertPoint, landingLatDeg, landingLonDeg, true);
                     [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
                     simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput, divertPoint);
+                    divertTrajectories{idx} = stateTraj(:,1:3);
                 end
             else
                 % Re-Optimization Simulation
@@ -221,6 +223,24 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, ...
             refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, ...
             secondaryData, optHistory, ICstates);
+    end
+
+    %% 8. Divert Plot
+    if divertEnabled
+        figure(); hold on;
+        for idx = 1:size(problemParams.divertPoints, 1)
+            traj = divertTrajectories{idx};
+            plot3(traj(:,1),traj(:,2),traj(:,3))
+        end
+        xlabel("X");ylabel("Y");xlabel("Z");
+        xlim([-0.2,0.2]);ylim([-0.2,0.2]);zlim([-173.65,-173.6]);
+
+        figure(); hold on;
+        for idx = 1:size(problemParams.divertPoints, 1)
+            traj = divertTrajectories{idx} * refVals.L_ref;
+            plot(traj(end,1),traj(end,2),'.','MarkerSize',12);
+        end
+        xlabel("X");ylabel("Y");
     end
 
 end

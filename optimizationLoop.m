@@ -28,7 +28,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
 
     % Fmincon Constraints
     Aineq = [-1  0  0;      % -gamma <= -gamma1eps ---- gamma >= gamma1eps
-              1 -1  0;      %  gamma -gamma2 <= -1e-4 ---- gamma2 >= gamma + 1e-4
+              1 -1  0;      %  gamma -gamma2 <= -tol ---- gamma2 >= gamma + tol
               0  0 -1];     % tgo >= 0.01
     bineq = [-optimizationParams.gamma1eps; -optimizationParams.gamma2eps; -0.01];
 
@@ -67,7 +67,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     end
 
     if exitflag <= 0
-            fprintf('\n=== DIAGNOSTIC: Optimization Failed (exitflag=%d) ===\n', exitflag);
+            fprintf('\n=== Optimization Failed (exitflag=%d) ===\n', exitflag);
             fprintf('Params: gamma=%.4f, gamma2=%.4f, tgo=%.4f\n', optParams(1), optParams(2), optParams(3));
             [c, ~] = nonlincon(optParams);
             violated = find(c > 1e-6);
