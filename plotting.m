@@ -1,34 +1,45 @@
-function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, secondaryData, optHistory, ICstates)
+function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, secondaryData, optHistory, ICstates, betaParam)
 
 
     %% Preprocess
+    runTime = datestr(now, 'HH:MM:SS');
     
-    % Determine plotting mode
-    isReOpt = optimParams.updateOpt;
-    if isReOpt
-        % Reopt vs Static Mode
-        labelMainSim = 'Re-Optimized Flight';
-        labelSecSim  = 'Static Baseline Flight';
-        
-        labelMainOpt = 'Initial Plan'; 
-        plotSecondaryOptim = false; 
-        
-        titleSuffixSim  = ' (Re-Opt vs Static)';
-        titleSuffixOpt  = ' (Initial Plan)';
+    descString = string.empty;
+    
+    descString(end+1) = sprintf("Beta: %.1f", betaParam);
+    if optimParams.updateOpt
+        descString(end+1) = "ReOpt";
     else
-        % Constrained vs Unconstrained Mode
-        labelMainSim = 'Constrained Flight';
-        labelSecSim  = 'Unconstrained Flight';
-        
-        labelMainOpt = 'Constrained Plan';
-        labelSecOpt  = 'Unconstrained Plan';
-        
-        plotSecondaryOptim = true; % We want to compare the plans here
-        
-        titleSuffixSim  = ' (Constrained vs Unconstrained)';
-        titleSuffixOpt  = ' (Constrained vs Unconstrained)';
+        descString(end+1) = "Static";
     end
+    if optimParams.pointingEnabled
+        descString(end+1) = "Pointing";
+    end
+    if optimParams.glideSlopeEnabled
+        descString(end+1) = "Glideslope";
+    end
+    if flag_thrustGotLimited
+        descString(end+1) = "Saturated";
+    end
+    descString = join(descString, "+");
+    legendTag = descString + " @ " + runTime;
 
+
+    % Define Color for each run
+    fig1Handle = findobj(0, 'Name', 'Optim Throttle');
+    existingRuns = 0;
+    if ~isempty(fig1Handle)
+        % Count data entries on Fig 1
+        fig1Entries = findobj(fig1Handle, 'Type', 'line');
+        for i = 1:length(fig1Entries)
+            if contains(fig1Entries(i).DisplayName, '@')
+                existingRuns = existingRuns + 1;
+            end
+        end
+    end
+    availableColors = colororder;
+    colorIdx = mod(existingRuns, size(availableColors,1)) + 1;
+    runColor = availableColors(colorIdx, :);
     % Check for simulation data availability
     hasSimData = ~isempty(tTraj) && ~isempty(stateTraj) && ~isempty(aTList);
     
@@ -43,7 +54,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     [~, ~, U0] = enuBasis(deg2rad(problemParams.landingLatDeg),deg2rad(problemParams.landingLonDeg));
     isp = nonDimParams.ispND;
 
-    % Process Primary Simulation Data
+    % Process Simulation Data
     if hasSimData
         rState = stateTraj(:,1:3);
         rDim = rState * L_ref;
@@ -51,8 +62,8 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         vDim = vState * V_ref;
         mState = stateTraj(:,7);
         mDim = mState * M_ref;
-        tgoState = tgo0 - tTraj;
-        tgoDim = tgoState * T_ref;
+        %tgoState = tgo0 - tTraj;
+        %tgoDim = tgoState * T_ref;
 
         aTDim = aTList * A_ref;
         aTDimNorm = vecnorm(aTDim,2,1);
@@ -76,33 +87,6 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         aT_ENU = [aE, aN, aU];
         aT_norm_ENU = vecnorm(aT_ENU,2,2);
     end
-    
-    % Process Secondary Data
-    hasSec = exist('secondaryData','var') && ~isempty(secondaryData);
-    if hasSec
-        tTrajSec = secondaryData.tTraj;
-        rStateSec = secondaryData.stateTraj(:,1:3);
-        vStateSec = secondaryData.stateTraj(:,4:6);
-        mStateSec = secondaryData.stateTraj(:,7);
-        rDimSec = rStateSec * L_ref;
-        vDimSec = vStateSec * V_ref;
-        mDimSec = mStateSec * M_ref;
-        deltaR_Sec   = MCMF2ENU(rDimSec', problemParams.landingLatDeg, problemParams.landingLonDeg, true,  true);
-        vDimENU_Sec  = MCMF2ENU(vDimSec', problemParams.landingLatDeg, problemParams.landingLonDeg, false, true);
-        EastSec = deltaR_Sec(1,:)';
-        NorthSec = deltaR_Sec(2,:)';
-        UpSec = deltaR_Sec(3,:)';
-
-        alt_m_Sec = vecnorm(rDimSec,2,2) - rMoon;
-        aTDimSec = secondaryData.aTList * A_ref;
-        aTDimENU_Sec = MCMF2ENU(aTDimSec, problemParams.landingLatDeg, problemParams.landingLonDeg, false, true);
-        aE_Sec = aTDimENU_Sec(1,:)';
-        aN_Sec = aTDimENU_Sec(2,:)';
-        aU_Sec = aTDimENU_Sec(3,:)';
-        aT_norm_ENU_Sec = vecnorm([aE_Sec, aN_Sec, aU_Sec], 2, 2);
-
-        aTDimNormSec = vecnorm(aTDimSec,2,1)';
-    end
 
     maxThrustDim = problemParams.maxThrustDim;
     minThrustDim = problemParams.minThrustDim;
@@ -125,70 +109,39 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     NOpt = rdOptimTOPODim(2, :);
     UOpt = rdOptimTOPODim(3, :);
     
-    % Figure: Optimization Throttle Profile
-    figure('Name',"Optim Throttle"); hold on;
+    % Figure 1: Optimization Throttle Profile
+    figure(1); hold on; grid on;
+    set(gcf, 'Name', 'Optim Throttle')
     thrustDim = aTNormOpt .* mOptim *(refVals.M_ref*refVals.A_ref);
     
-    plot(tspanOpt(2:end)*T_ref, thrustDim(2:end)/problemParams.maxThrustDim, 'b-', 'LineWidth', 1.5, 'DisplayName', labelMainOpt);
+    plot(tspanOpt(2:end)*T_ref, thrustDim(2:end)/problemParams.maxThrustDim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
     
-    if plotSecondaryOptim && hasSec && isfield(secondaryData,'aTOptim') && ~isempty(secondaryData.aTOptim) ...
-         && isfield(secondaryData,'mOptim')  && ~isempty(secondaryData.mOptim)
-
-        aTOptimSec = secondaryData.aTOptim';
-        mOptimSec  = secondaryData.mOptim';
-        aTNormOptSec = vecnorm(aTOptimSec, 2, 2);
-        thrustDimSec_optim = aTNormOptSec .* mOptimSec * (refVals.M_ref*refVals.A_ref);
-        tgo0Sec = secondaryData.optParams(3);
-
-        nodeCountSec = size(aTOptimSec,1);
-        tgospanOptSec = linspace(0, tgo0Sec, nodeCountSec);
-        tspanOptSec   = tgo0Sec - tgospanOptSec;
-    
-        plot(tspanOptSec(2:end)*T_ref, thrustDimSec_optim(2:end)/problemParams.maxThrustDim, ...
-            'r--', 'LineWidth', 1.3, 'DisplayName', labelSecOpt);
+    if isempty(findobj(gca, 'DisplayName', 'Max Thrust'))
+        yline(1.0, 'k-', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
+        yline(problemParams.minThrustDim/problemParams.maxThrustDim, 'k-', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
     end
     
-    yline(1.0, 'k-', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
-    if optimParams.pointingEnabled
-        yline(0.95, 'k:', 'LineWidth', 1, 'DisplayName', '95% Max');
-    end
-    yline(problemParams.minThrustDim/problemParams.maxThrustDim, 'k-', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
-    xlabel('Time s'); ylabel('Throttle Fraction'); title(['Planned Throttle Profile' titleSuffixOpt]);
-    
-    if plotSecondaryOptim && hasSec
-        subtitle(sprintf("Main - gamma: %.2f, kr: %.2f, tgo: %.2f s\n Sec - gamma: %.2f, kr: %.2f, tgo: %.2f s", optParams(1),optParams(2),optParams(3)*T_ref,secondaryData.optParams(1),secondaryData.optParams(2),secondaryData.optParams(3)*T_ref));
-    else
-        subtitle(sprintf("Plan - gamma: %.2f, kr: %.2f, tgo: %.2f s", optParams(1),optParams(2),optParams(3)*T_ref));
-    end
+    xlabel('Time s'); ylabel('Throttle Fraction');
+    title('Planned Throttle Profile');
     legend('Location','best');
 
-    % Figure: Optimization Range vs Altitude
+    % Figure 2: Optimization Range vs Altitude
     rdOptimDim = rdOptim*L_ref;
     rhatOpt = rdOptimDim ./ vecnorm(rdOptimDim,2,2);
     centralOpt = acos(rhatOpt*U0);
     arcLengthOpt = rMoon * centralOpt;
     alt_opt = vecnorm(rdOptimDim,2,2) - rMoon;
 
-    figure('Name','Opt Range vs Altitude'); hold on;
+    figure(2); hold on; grid on;
+    set(gcf, 'Name', 'Optimization Ground Range vs Alt');
 
-    if plotSecondaryOptim && hasSec && isfield(secondaryData,'rdOptim')
-        rdOptimSec = secondaryData.rdOptim';
-        rdOptimSecDim = rdOptimSec * L_ref;
-        rhatOptSec = rdOptimSecDim ./ vecnorm(rdOptimSecDim,2,2);
-        centralOptSec = acos(rhatOptSec*U0);
-        arcLengthOptSec = rMoon * centralOptSec;
-        alt_optSec = vecnorm(rdOptimSecDim,2,2) - rMoon;
-        plot(arcLengthOptSec/1000, alt_optSec/1000, 'r--', 'LineWidth', 1.5, 'DisplayName', labelSecOpt);
-    end
-
-    plot(arcLengthOpt/1000, alt_opt/1000, 'b-', 'LineWidth', 1.5, 'DisplayName', labelMainOpt);
-    xlabel('Range km'); ylabel('Up km'); title(['Planned Range vs Altitude' titleSuffixOpt]);
-    grid on;
+    plot(arcLengthOpt/1000, alt_opt/1000, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+    xlabel('Range km'); ylabel('Up km');
+    title('Planned Flight Path (Range vs Alt)');
     legend('Location','best');
     
-    % Figure: Optimization 3D Trajectory
+    % Figure 3: Optimization 3D Trajectory
     UPlotMax = 3000; % Alt filter threshold
-    
     t_nodes = linspace(0, tgo0, nodeCount);
     t_highres = linspace(0, tgo0, 2000); 
     
@@ -198,177 +151,99 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     
     idx_plot = UTraj_HR <= UPlotMax; 
     if ~any(idx_plot); idx_plot = true(size(UTraj_HR)); end 
-    
-    ETraj_Plot = ETraj_HR(idx_plot);
-    NTraj_Plot = NTraj_HR(idx_plot);
-    UTraj_Plot = UTraj_HR(idx_plot);
+
+    figure(3); hold on; grid on; axis equal;
+    set(gcf, 'Name', 'Optimization 3D');
     
     % Generate Glideslope Cone Visualization
-    theta_fun = @(u) min(89.9, 45 + 45 * max(0, min(1, (u - 250) ./ 250))); 
-    Umin = 0; 
-    Umax = min(500, max(UTraj_Plot, [], 'omitnan')); 
-    if isempty(Umax) || isnan(Umax); Umax = 500; end
-    U_samp = linspace(Umin, Umax, 360);
-    
-    theta_deg = theta_fun(U_samp);
-    cosBound = cosd(theta_deg);
-    cosBound = max(cosBound, 1e-3);
-    R_samp = U_samp .* sqrt(1 - cosBound.^2) ./ cosBound; 
-    Rcap = 3000;
-    R_samp = min(R_samp, Rcap);
-    
-    azimuth = linspace(0, 2*pi, 360);
-    [azGrid, altGrid] = meshgrid(azimuth, U_samp);
-    [~, rGrid] = meshgrid(azimuth, R_samp);
-    eastGrid  = rGrid .* cos(azGrid);
-    northGrid = rGrid .* sin(azGrid);
-    
-    % Plateau Ring
-    UPlat = Umax; RPlat = Rcap;
-    azPlat = linspace(0, 2*pi, 360);
-    eastPlat = RPlat * cos(azPlat);
-    northPlat = RPlat * sin(azPlat);
-    UPlat = UPlat * ones(size(azPlat));
-    
-    figure('Name','Opt 3D'); hold on; grid on; axis equal;
-    
-    % Main Trajectory
-    plot3(ETraj_Plot/1000, NTraj_Plot/1000, UTraj_Plot/1000, 'b.-', 'LineWidth', 2, 'MarkerSize',5, 'DisplayName', labelMainOpt);
-    
-    surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8, 'HandleVisibility','off');
-    plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 0.8, 'HandleVisibility','off');
-    
-    if plotSecondaryOptim && hasSec && isfield(secondaryData,'rdOptim')
-        rdOptimSec = secondaryData.rdOptim';
-        rdOptimSecTOPO = MCMF2ENU(rdOptimSec',problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
-        rdOptimSecTOPODim = rdOptimSecTOPO * L_ref;
+    if isempty(findobj(gca, 'Type', 'Surface'))
+        theta_fun = @(u) min(89.9, 45 + 45 * max(0, min(1, (u - 250) ./ 250))); 
+        Umin = 0; 
+        Umax = min(500, max(UTraj_HR(idx_plot), [], 'omitnan')); 
+        if isempty(Umax) || isnan(Umax); Umax = 500; end
+        U_samp = linspace(Umin, Umax, 360);
+        theta_deg = theta_fun(U_samp);
+        cosBound = cosd(theta_deg);
+        cosBound = max(cosBound, 1e-3);
+        R_samp = U_samp .* sqrt(1 - cosBound.^2) ./ cosBound; 
+        Rcap = 3000;
+        R_samp = min(R_samp, Rcap);
+        azimuth = linspace(0, 2*pi, 360);
+        [azGrid, altGrid] = meshgrid(azimuth, U_samp);
+        [~, rGrid] = meshgrid(azimuth, R_samp);
+        eastGrid  = rGrid .* cos(azGrid);
+        northGrid = rGrid .* sin(azGrid);
         
-        tgoSec = secondaryData.optParams(3);
-        nodeCountSec = size(rdOptimSecTOPODim, 2);
-        t_nodesSec = linspace(0, tgoSec, nodeCountSec);
-        t_highresSec = linspace(0, tgoSec, 2000);
-        
-        ETrajSec_HR = spline(t_nodesSec, rdOptimSecTOPODim(1,:), t_highresSec);
-        NTrajSec_HR = spline(t_nodesSec, rdOptimSecTOPODim(2,:), t_highresSec);
-        UTrajSec_HR = spline(t_nodesSec, rdOptimSecTOPODim(3,:), t_highresSec);
-        
-        idx_plotSec = UTrajSec_HR <= UPlotMax;
-        if ~any(idx_plotSec); idx_plotSec = true(size(UTrajSec_HR)); end
-        
-        plot3(ETrajSec_HR(idx_plotSec)/1000, NTrajSec_HR(idx_plotSec)/1000, UTrajSec_HR(idx_plotSec)/1000, ...
-            'r--', 'LineWidth', 1.5, 'DisplayName', labelSecOpt);
+        surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8, 'HandleVisibility','off');
+        % Plateau Ring
+        UPlat = Umax; RPlat = Rcap;
+        azPlat = linspace(0, 2*pi, 360);
+        eastPlat = RPlat * cos(azPlat);
+        northPlat = RPlat * sin(azPlat);
+        UPlat = UPlat * ones(size(azPlat));
+        plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 0.8, 'HandleVisibility','off');
     end
     
-    xlabel('East (km)');
-    ylabel('North (km)');
-    zlabel('Up (km)');
-    title(['Planned 3D Trajectory (Final 3km)' titleSuffixOpt]);
+    % Main Trajectory
+    plot3(ETraj_HR(idx_plot)/1000, NTraj_HR(idx_plot)/1000, UTraj_HR(idx_plot)/1000, '.-', 'Color', runColor, 'LineWidth', 2, 'MarkerSize',5, 'DisplayName', legendTag);
+    
+   
+    xlabel('East (km)'); ylabel('North (km)'); zlabel('Up (km)');
+    title('Planned 3D Trajectory (Final 3km)');
     view(80, 15); camproj orthographic;
-    zlim([0,2]);
-    xlim([-3,3]);
-    ylim([-3,3]);
+    zlim([0,2]); xlim([-3,3]); ylim([-3,3]);
     axis square;
     legend('Location','bestoutside');
 
-    % Figure: Optimization Velocity Profile
+    % Figure 4: Optimization Velocity Profile
     vdOptimDim = vdOptim * V_ref;
     vdOptimTOPO = MCMF2ENU(vdOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
-    figure('Name','Opt Vel TOPO'); hold on;
+    figure(4); hold on; grid on;
+    set(gcf, 'Name', 'Opt Vel TOPO');
     
-    if ~plotSecondaryOptim
-        % Single Plot Mode: Use Colors for Components (All Solid)
-        plot(tspanOpt*T_ref, vdOptimTOPO(1,:), 'r-', 'LineWidth', 1.5, 'DisplayName', 'East');
-        plot(tspanOpt*T_ref, vdOptimTOPO(2,:), 'g-', 'LineWidth', 1.5, 'DisplayName', 'North');
-        plot(tspanOpt*T_ref, vdOptimTOPO(3,:), 'b-', 'LineWidth', 1.5, 'DisplayName', 'Up');
-        plot(tspanOpt*T_ref, vecnorm(vdOptimTOPO, 2, 1), 'k-', 'LineWidth', 2, 'DisplayName', 'Mag');
-    else
-        % Comparison Mode: Blue vs Red
-        plot(tspanOpt*T_ref, vdOptimTOPO(1,:), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' East']);
-        plot(tspanOpt*T_ref, vdOptimTOPO(2,:), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' North']);
-        plot(tspanOpt*T_ref, vdOptimTOPO(3,:), 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' Up']);
-        plot(tspanOpt*T_ref, vecnorm(vdOptimTOPO, 2, 1), 'b-', 'LineWidth', 2, 'DisplayName', [labelMainOpt ' Mag']);
-        
-        if hasSec && isfield(secondaryData,'vdOptim')
-            vdOptimSec = secondaryData.vdOptim';
-            vdOptimSecDim = vdOptimSec * V_ref;
-            vdOptimSecTOPO = MCMF2ENU(vdOptimSecDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
-            tspanOptSec = tgo0Sec - linspace(0, tgo0Sec, size(vdOptimSec,1));
-            plot(tspanOptSec*T_ref, vecnorm(vdOptimSecTOPO, 2, 1), 'r--', 'LineWidth', 2, 'DisplayName', [labelSecOpt ' Mag']);
-        end
-    end
+    plot(tspanOpt*T_ref, vecnorm(vdOptimTOPO, 2, 1), '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+    % plot(tspanOpt*T_ref, vdOptimTOPO(1,:), 'b-', 'LineWidth', 1.0, 'DisplayName', [legendTag ' East']);
+    % plot(tspanOpt*T_ref, vdOptimTOPO(2,:), 'b--', 'LineWidth', 1.0, 'DisplayName', [legendTag ' North']);
+    % plot(tspanOpt*T_ref, vdOptimTOPO(3,:), 'b:', 'LineWidth', 1.0, 'DisplayName', [legendTag ' Up']);
     
+
     legend('Location', 'best');
-    xlabel('Time s'); ylabel('Velocity m/s'); title(['Planned Velocity Profile' titleSuffixOpt]);
+    xlabel('Time s'); ylabel('Velocity m/s'); title('Planned Velocity Profile (TOPO)');
     grid on;
     xlim([0, ceil(max(tspanOpt*T_ref)/100)*100]);
 
-    % Figure: Optimization TOPO Acceleration
+    % Figure 5: Optimization TOPO Acceleration
     aTOptimDim = aTOptim * A_ref;
     aTOptimTOPO = MCMF2ENU(aTOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
-    figure('Name','Opt TOPO Accel'); hold on;
+    figure(5); hold on; grid on;
+    set(gcf, 'Name', 'Opt Accel TOPO');
     
-    if ~plotSecondaryOptim
-        % Single Plot Mode: Use Colors for Components (All Solid)
-        plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(1,2:end), 'r-', 'LineWidth', 1.5, 'DisplayName', 'East');
-        plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(2,2:end), 'g-', 'LineWidth', 1.5, 'DisplayName', 'North');
-        plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(3,2:end), 'b-', 'LineWidth', 1.5, 'DisplayName', 'Up');
-        plot(tspanOpt(2:end)*T_ref, vecnorm(aTOptimTOPO(:,2:end),2,1), 'k-', 'LineWidth', 2, 'DisplayName', 'Mag');
-    else
-        % Comparison Mode: Blue vs Red
-        plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(1,2:end), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' East']);
-        plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(2,2:end), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' North']);
-        plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(3,2:end), 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' Up']);
-        plot(tspanOpt(2:end)*T_ref, vecnorm(aTOptimTOPO(:,2:end),2,1), 'b-', 'LineWidth', 2, 'DisplayName', [labelMainOpt ' Mag']);
-        
-        if hasSec && isfield(secondaryData,'aTOptim')
-            aTOptimSec = secondaryData.aTOptim';
-            aTOptimSecDim = aTOptimSec * A_ref;
-            aTOptimSecTOPO = MCMF2ENU(aTOptimSecDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
-            tspanOptSec = tgo0Sec - linspace(0, tgo0Sec, size(aTOptimSec,1));
-            plot(tspanOptSec(2:end)*T_ref, vecnorm(aTOptimSecTOPO(:,2:end),2,1), 'r--', 'LineWidth', 2, 'DisplayName', [labelSecOpt ' Mag']);
-        end
-    end
-
-    plot(tspanOpt(1)*T_ref,norm(nonDimParams.afStarND)*A_ref,'.','MarkerSize',10, 'HandleVisibility', 'off'); 
-    plot(tspanOpt(1)*T_ref,A_ref,'x','MarkerSize',10, 'HandleVisibility', 'off'); 
+    plot(tspanOpt(2:end)*T_ref, vecnorm(aTOptimTOPO(:,2:end),2,1), '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName',legendTag);
+    % plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(1,2:end), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' East']);
+    % plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(2,2:end), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' North']);
+    % plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(3,2:end), 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' Up']);
     
     legend('Location', 'best');
-    xlabel('Time s'); ylabel('Accel m/s^2'); title(['Planned Accel Profile (TOPO)' titleSuffixOpt]);
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Planned Accel Profile (TOPO)');
     grid on;
 
-    % Figure: Optimization MCMF Acceleration
-    aTOptimDim = aTOptimDim';
-    figure('Name','Opt MCMF Accel'); hold on;
-    
-    if ~plotSecondaryOptim
-        % Single Plot Mode: Use Colors for Components (All Solid)
-        plot(tspanOpt(2:end)*T_ref, aTOptimDim(1,2:end), 'r-', 'LineWidth', 1.5, 'DisplayName', 'X');
-        plot(tspanOpt(2:end)*T_ref, aTOptimDim(2,2:end), 'g-', 'LineWidth', 1.5, 'DisplayName', 'Y');
-        plot(tspanOpt(2:end)*T_ref, aTOptimDim(3,2:end), 'b-', 'LineWidth', 1.5, 'DisplayName', 'Z');
-        plot(tspanOpt(2:end)*T_ref, vecnorm(aTOptimDim(:,2:end),2,1), 'k-', 'LineWidth', 2, 'DisplayName', 'Mag');
-    else
-        % Comparison Mode: Blue vs Red
-        plot(tspanOpt(2:end)*T_ref, aTOptimDim(1,2:end), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' X']);
-        plot(tspanOpt(2:end)*T_ref, aTOptimDim(2,2:end), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' Y']);
-        plot(tspanOpt(2:end)*T_ref, aTOptimDim(3,2:end), 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' Z']);
-        plot(tspanOpt(2:end)*T_ref, vecnorm(aTOptimDim(:,2:end),2,1), 'b-', 'LineWidth', 2, 'DisplayName', [labelMainOpt ' Mag']);
-        
-        if hasSec
-            aTOptimSecDim_MCMF = (secondaryData.aTOptim' * A_ref)'; 
-            plot(tspanOptSec(2:end)*T_ref, vecnorm(aTOptimSecDim_MCMF(:,2:end),2,1), 'r--', 'LineWidth', 2, 'DisplayName', [labelSecOpt ' Mag']);
-        end
-    end
-
-    plot(tspanOpt(1)*T_ref,norm(nonDimParams.afStarND)*A_ref,'.','MarkerSize',10, 'HandleVisibility', 'off'); 
-    plot(tspanOpt(1)*T_ref,A_ref,'x','MarkerSize',10, 'HandleVisibility', 'off'); 
-    
-    legend('Location', 'best');
-    xlabel('Time s'); ylabel('Accel m/s^2'); title(['Planned Accel Profile (MCMF)' titleSuffixOpt]);
-    grid on;
+    % % Figure 6: Optimization MCMF Acceleration
+    % aTOptimDim = aTOptimDim';
+    % figure(6); hold on; grid on;
+    % set(gcf, 'Name', 'Opt Accel MCMF');
+    % 
+    % plot(tspanOpt(2:end)*T_ref, vecnorm(aTOptimDim(:,2:end),2,1), 'b-', 'LineWidth', 2, 'DisplayName', legendTag);
+    % % plot(tspanOpt(2:end)*T_ref, aTOptimDim(1,2:end), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' X']);
+    % % plot(tspanOpt(2:end)*T_ref, aTOptimDim(2,2:end), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' Y']);
+    % % plot(tspanOpt(2:end)*T_ref, aTOptimDim(3,2:end), 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' Z']);
+    % 
+    % legend('Location', 'best');
+    % xlabel('Time s'); ylabel('Accel m/s^2'); title('Planned Accel Profile (MCMF)');
+    % grid on;
 
     %% Simulation Figures
     if hasSimData
-        % Figure: 3D Trajectory
+        % Figure 6: 3D Trajectory
         idx2km = find(alt_m <= 2000, 1, 'first');
         if isempty(idx2km)
             NtotalSim = numel(alt_m);
@@ -380,206 +255,160 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         NTrajSim = North(idx_sim);
         UTrajSim = Up(idx_sim);
 
-        if hasSec
-            idx2kmSec = find(alt_m_Sec <= 2000, 1, 'first');
-            if isempty(idx2kmSec)
-                NtotalSimSec = numel(alt_m_Sec);
-                idx2kmSec = max(1, NtotalSimSec - floor(0.20*NtotalSimSec) + 1);
-            end
-            idx_simSec = idx2kmSec:numel(alt_m_Sec);
+        figure(6); hold on; grid on; axis equal;
+        set(gcf, 'Name', 'Sim 3D');
 
-            ETrajSimSec = EastSec(idx_simSec);
-            NTrajSimSec = NorthSec(idx_simSec);
-            UTrajSimSec = UpSec(idx_simSec);
+        if isempty(findobj(gca, 'Type', 'Surface'))
+            theta_fun = @(u) min(89.9, 45 + 45 * max(0, min(1, (u - 250) ./ 250))); 
+            Umin = 0; 
+            Umax = min(500, max(UTraj_HR(idx_plot), [], 'omitnan')); 
+            if isempty(Umax) || isnan(Umax); Umax = 500; end
+            U_samp = linspace(Umin, Umax, 360);
+            theta_deg = theta_fun(U_samp);
+            cosBound = cosd(theta_deg);
+            cosBound = max(cosBound, 1e-3);
+            R_samp = U_samp .* sqrt(1 - cosBound.^2) ./ cosBound; 
+            Rcap = 3000;
+            R_samp = min(R_samp, Rcap);
+            azimuth = linspace(0, 2*pi, 360);
+            [azGrid, altGrid] = meshgrid(azimuth, U_samp);
+            [~, rGrid] = meshgrid(azimuth, R_samp);
+            eastGrid  = rGrid .* cos(azGrid);
+            northGrid = rGrid .* sin(azGrid);
+            
+            surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8, 'HandleVisibility','off');
+            % Plateau Ring
+            UPlat = Umax; RPlat = Rcap;
+            azPlat = linspace(0, 2*pi, 360);
+            eastPlat = RPlat * cos(azPlat);
+            northPlat = RPlat * sin(azPlat);
+            UPlat = UPlat * ones(size(azPlat));
+            plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 0.8, 'HandleVisibility','off');
         end
 
-        theta_fun = @(u) min(89.9, 45 + 45*max(0, min(1, (u-250)./250)));
-        UminEnv = 0; 
-        UmaxEnv = min(500, max(UTrajSim,[],'omitnan'));
-        U_samp  = linspace(UminEnv, UmaxEnv, 360);
-        theta_deg = theta_fun(U_samp);
-        cosBound  = max(cosd(theta_deg), 1e-3);
-        R_samp    = U_samp .* sqrt(1 - cosBound.^2) ./ cosBound;
-        Rcap      = 3000;
-        R_samp    = min(R_samp, Rcap);
-        azimuth         = linspace(0, 2*pi, 360);
-        [azGrid, altGrid] = meshgrid(azimuth, U_samp);
-        [~, rGrid]        = meshgrid(azimuth, R_samp);
-        eastGrid  = rGrid .* cos(azGrid);
-        northGrid = rGrid .* sin(azGrid);
+        plot3(ETrajSim/1000, NTrajSim/1000, UTrajSim/1000, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
 
-        UPlat = UmaxEnv; RPlat = Rcap;
-        azPlat = linspace(0, 2*pi, 360);
-        eastPlat  = RPlat * cos(azPlat);
-        northPlat = RPlat * sin(azPlat);
-        UPlat     = UPlat * ones(size(azPlat));
-
-        figure('Name','Sim 3D'); hold on; grid on; axis equal;
-        surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8);
-        plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 0.8);
-        plot3(ETrajSim/1000, NTrajSim/1000, UTrajSim/1000, 'b-', 'LineWidth', 2, 'DisplayName', labelMainSim);
-        if hasSec
-            plot3(ETrajSimSec/1000, NTrajSimSec/1000, UTrajSimSec/1000, 'r-', 'LineWidth', 2, 'DisplayName', labelSecSim);
-        end
 
         xlabel('East (km)'); ylabel('North (km)'); zlabel('Up (km)');
-        title(['3D Trajectory (Sim) Final 2 KM' titleSuffixSim]);
+        title('3D Trajectory (Sim) Final 2 KM');
         view(80, 15); camproj orthographic;
         zlim([0, 2]); xlim([-3,3]); ylim([-3,3]); axis square;
         legend('Location','bestoutside');
 
-        % Figure: Range vs Altitude
+        % Figure 7: Range vs Altitude
         rhat      = rDim ./ vecnorm(rDim,2,2);
         central   = acos(rhat*U0);
         arcLength = rMoon * central;
         
-        figure('Name','Sim Range vs Altitude'); hold on;
-        plot(arcLength/1000, alt_m/1000, 'b-', 'DisplayName', labelMainSim);
-        
-        if hasSec
-            rhatSec      = rDimSec ./ vecnorm(rDimSec,2,2);
-            centralSec   = acos(rhatSec*U0);
-            arcLengthSec = rMoon * centralSec;
-            plot(arcLengthSec/1000, alt_m_Sec/1000, 'r-', 'DisplayName', labelSecSim);
-        end
+        figure(7); hold on; grid on;
+        set(gcf, 'Name', 'Sim Range vs Altitude');
+        plot(arcLength/1000, alt_m/1000, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
 
         xlabel('Range (km)'); ylabel('Up (km)');
-        title(['Range vs Altitude (Sim)' titleSuffixSim]); grid on;
+        title('Sim Range vs Altitude'); grid on;
         legend('Location','best');
 
-        % Figure: TOPO Acceleration
-        figure('Name','Sim TOPO Accel'); hold on;
-        plot(tTraj*T_ref, aE, 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' East']);
-        plot(tTraj*T_ref, aN, 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' North']);
-        plot(tTraj*T_ref, aU, 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Up']);
-        plot(tTraj*T_ref, aT_norm_ENU, 'b-', 'LineWidth', 2, 'DisplayName', [labelMainSim ' Mag']);
-        
-        if hasSec
-            plot(tTrajSec*T_ref, aT_norm_ENU_Sec, 'r-', 'LineWidth', 2, 'DisplayName', [labelSecSim ' Mag']);
-        end
-        
-        plot(tTraj(end)*T_ref,norm(nonDimParams.afStarND)*A_ref,'.','MarkerSize',10, 'HandleVisibility','off'); 
-        plot(tTraj(end)*T_ref,A_ref,'x','MarkerSize',10, 'HandleVisibility','off'); 
-        
-        legend('Location', 'best');
-        xlabel('Time s'); ylabel('Accel m/s^2'); title(['Commanded Accel Profile (TOPO)' titleSuffixSim]);
-        grid on;
+        % Figure 8: TOPO Acceleration
+        figure(8); hold on; grid on;
+        set(gcf, 'Name', 'Sim TOPO Accel');
 
-        % Figure: MCMF Acceleration
-        figure('Name','Sim MCMF Accel'); hold on;
-        plot(tTraj*T_ref, aTDim(1,:), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' X']);
-        plot(tTraj*T_ref, aTDim(2,:), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Y']);
-        plot(tTraj*T_ref, aTDim(3,:), 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Z']);
-        plot(tTraj*T_ref, aTDimNorm, 'b-', 'LineWidth', 2, 'DisplayName', [labelMainSim ' Mag']);
-        
-        if hasSec
-            plot(tTrajSec*T_ref, aTDimNormSec, 'r-', 'LineWidth', 2, 'DisplayName', [labelSecSim ' Mag']);
-        end
-        
+        plot(tTraj*T_ref, aT_norm_ENU, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+        % plot(tTraj*T_ref, aE, 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' East']);
+        % plot(tTraj*T_ref, aN, 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' North']);
+        % plot(tTraj*T_ref, aU, 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Up']);
+
         legend('Location', 'best');
-        xlabel('Time s'); ylabel('Accel m/s^2'); title(['Commanded Accel Profile (MCMF)' titleSuffixSim]);
+        xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (TOPO)');
         if flag_thrustGotLimited
             subtitle("Thrust is being Throttled");
         end
-        grid on;
 
-        % Figure: Velocity Profile
-        figure('Name','Sim Vel'); hold on;
-        plot(tTraj*T_ref, vE, 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' East']);
-        plot(tTraj*T_ref, vN, 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' North']);
-        plot(tTraj*T_ref, vU, 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Up']);
-        plot(tTraj*T_ref, vecnorm(vDim, 2, 2), 'b-', 'LineWidth', 2, 'DisplayName', [labelMainSim ' Mag']);
+        % % Figure 9: MCMF Acceleration
+        % figure(9); hold on; grid on;
+        % set(gcf, 'Name', 'Sim MCMF Accel');
+        % 
+        % plot(tTraj*T_ref, aTDimNorm, 'b-', 'LineWidth', 2, 'DisplayName', legendTag);
+        % % plot(tTraj*T_ref, aTDim(1,:), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' X']);
+        % % plot(tTraj*T_ref, aTDim(2,:), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Y']);
+        % % plot(tTraj*T_ref, aTDim(3,:), 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Z']);
+        % 
+        % legend('Location', 'best');
+        % xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (MCMF)');
+        % if flag_thrustGotLimited
+        %     subtitle("Thrust is being Throttled");
+        % end
 
-        if hasSec
-            plot(tTrajSec*T_ref, vecnorm(vDimSec, 2, 2), 'r-', 'LineWidth', 2, 'DisplayName', [labelSecSim ' Mag']);
-        end
+        % Figure 9: Velocity Profile
+        figure(9); hold on; grid on;
+        set(gcf, 'Name', 'Sim Velocity');
+
+        plot(tTraj*T_ref, vecnorm(vDim, 2, 2), '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+        % plot(tTraj*T_ref, vE, 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' East']);
+        % plot(tTraj*T_ref, vN, 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' North']);
+        % plot(tTraj*T_ref, vU, 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Up']);
 
         legend('Location', 'best');
-        xlabel('Time s'); ylabel('Velocity m/s'); title(['Velocity Profile (Dim)' titleSuffixSim]);
+        xlabel('Time s'); ylabel('Velocity m/s'); title('Sim Velocity Profile (Dim)');
         grid on;
         
-        % Figure: Throttle Profile
-        figure('Name','Sim Throttle'); hold on;
-        thrustDim = aTDimNorm' .* mDim;
-        plot(tTraj*T_ref, thrustDim/maxThrustDim, 'b-', 'DisplayName', labelMainSim);
-        if hasSec
-            thrustDimSec = aTDimNormSec .* mDimSec;
-            plot(tTrajSec*T_ref, thrustDimSec/maxThrustDim, 'r-', 'DisplayName', labelSecSim);
-        end
-        yline(1.0,'k--','LineWidth',1,'DisplayName','Max Throttle'); 
-        yline(minThrustDim/maxThrustDim,'k--','LineWidth',1,'DisplayName','Min Throttle');
-        xlabel('Time s'); ylabel('Throttle Fraction'); title(['Time vs Throttle (Sim)' titleSuffixSim]); 
-        legend('Location','best'); grid on;
+        % Figure 10: Throttle and Mass
+        figure(10);
+        set(gcf, 'Name', 'Sim Throttle and Mass');
 
-        % Figure: Mass Depletion
-        figure('Name','Sim Mass Depletion'); hold on; grid on;
-        plot(tTraj*T_ref, mDim, 'b-', 'LineWidth', 2, 'DisplayName', labelMainSim);
-        if hasSec
-            plot(tTrajSec*T_ref, mDimSec, 'r-', 'LineWidth', 1.5, 'DisplayName', labelSecSim);
+        subplot(2,1,1); hold on; grid on;
+        thrustDim = aTDimNorm' .* mDim;
+        plot(tTraj*T_ref, thrustDim/maxThrustDim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+        if isempty(findobj(gca, 'DisplayName', 'Max Throttle'))
+            yline(1.0,'k--','LineWidth',1,'DisplayName','Max Throttle'); 
+            yline(minThrustDim/maxThrustDim,'k--','LineWidth',1,'DisplayName','Min Throttle');
         end
+        xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle (Sim)'); 
+        legend('Location','best'); grid on;
+        
+        subplot(2,1,2); hold on; grid on;
+        plot(tTraj*T_ref, mDim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
         xlabel('Time s'); ylabel('Mass kg'); title('Vehicle Mass vs Time');
         legend('Location','best');
         
         propUsedC  = max(0, mDim(1) - mDim(end));
-        if hasSec
-            propUsedU = max(0, mDimSec(1) - mDimSec(end));
-            subtitle(sprintf(['%s Used: %.1f kg\n%s Used: %.1f kg'], ...
-                labelMainSim, propUsedC, labelSecSim, propUsedU));
-        else
-            subtitle(sprintf('Propellant used = %.1f kg', propUsedC));
-        end
+        subtitle(sprintf('Propellant used = %.1f kg', propUsedC));
 
-        % Figure: Time vs Altitude
-        figure('Name','Sim Alt'); hold on;
-        plot(tTraj*T_ref, alt_m/1000, 'b-', 'LineWidth', 1.5, 'DisplayName', labelMainSim);
-        if hasSec
-            plot(tTrajSec*T_ref, alt_m_Sec/1000, 'r-', 'LineWidth', 1.5, 'DisplayName', labelSecSim);
-        end
-        xlabel('Time s'); ylabel('Altitude m'); title(['Time vs Altitude (Dimensional)' titleSuffixSim]);
+        % Figure 11: Time vs Altitude
+        figure(11); hold on; grid on;
+        set(gcf, 'Name', 'Sim Alt');
+        plot(tTraj*T_ref, alt_m/1000, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+
+        xlabel('Time s'); ylabel('Altitude m'); title('Time vs Altitude (Dimensional)');
         legend('Location','best');
         grid on;
 
-        % Figure: Pointing Angle Analysis
+        % Figure 12: Pointing Angle Analysis
         if optimParams.pointingEnabled
-            epsMag = 1e-12;
             aMag   = vecnorm([aE aN aU], 2, 2);
             thrustU_ENU = [aE aN aU] ./ aMag;          
             dotUp       = max(-1, min(1, thrustU_ENU(:,3)));   
             phiSim      = acosd(dotUp);                         
-            
             phi0_deg   = optimParams.minPointing;
-            
             tgoSim = (tTraj(end) - tTraj) * T_ref; 
             phiA_deg = 0.5 * (optimParams.maxTiltAccel) .* (tgoSim.^2);
             ThetaSim = min(180, phi0_deg + phiA_deg);
+
+            figure(12);
+            set(gcf, 'Name', 'Pointing Analysis');
+
             
-            if hasSec
-                aMagSec   = max(aT_norm_ENU_Sec, epsMag);
-                thrustU_ENU_Sec = [aE_Sec aN_Sec aU_Sec] ./ aMagSec;
-                dotUpSec  = max(-1, min(1, thrustU_ENU_Sec(:,3)));
-                phiSimSec = acosd(dotUpSec);
-                
-                tgoSecCalc = (tTrajSec(end) - tTrajSec) * T_ref;
-                phiA_deg_Sec = 0.5 * (optimParams.maxTiltAccel) .* (tgoSecCalc.^2);
-                ThetaSimSec = min(180, phi0_deg + phiA_deg_Sec);
-            end
-            
-            figure('Name','Pointing vs Limit (Sim)'); tiledlayout(2,1);
-            
-            nexttile; hold on; grid on;
-            plot(tTraj*T_ref, phiSim, 'b-', 'LineWidth', 1.6, 'DisplayName',[labelMainSim ' \phi']);
-            plot(tTraj*T_ref, ThetaSim, 'k--', 'LineWidth', 1.6, 'DisplayName','\Theta limit');
-            if hasSec
-                plot(tTrajSec*T_ref, phiSimSec, 'r-', 'LineWidth', 1.2, 'DisplayName',[labelSecSim ' \phi']);
-            end
+            subplot(2,1,1); hold on; grid on;
+            plot(tTraj*T_ref, phiSim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+            plot(tTraj*T_ref, ThetaSim, '--', 'Color', runColor, 'LineWidth', 2, 'DisplayName','\Theta Limit');
+
             xlabel('Time s'); ylabel('Angle deg');
-            title('Pointing angle versus limit');
+            title('Pointing Angle vs Limit');
             legend('Location','best');
             
-            nexttile; hold on; grid on;
-            plot(tTraj*T_ref, ThetaSim - phiSim, 'b-', 'LineWidth', 1.6, 'DisplayName','Margin (Main)');
-            if hasSec
-                 plot(tTrajSec*T_ref, ThetaSimSec - phiSimSec, 'r-', 'LineWidth', 1.2, 'DisplayName','Margin (Sec)');
+            subplot(2,1,2); hold on; grid on;
+            plot(tTraj*T_ref, ThetaSim - phiSim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+            if isempty(findobj(gca, 'DisplayName', 'Zero'))
+                 yline(0, 'k-', 'HandleVisibility', 'off');
             end
             xlabel('Time s'); ylabel('deg');
             title('Pointing margin (positive means within limit)');
@@ -591,8 +420,8 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
     %% 4. Parameter History (Re-Optimization Only)
     if ~isempty(optHistory) && exist('ICstates', 'var') && ~isempty(ICstates)
-        figure('Name', 'ReOpt Parameter History');
-        tiledlayout(5, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+        figure(13);
+        set(gcf, 'Name', 'ReOpt Parameter History');
         
         t_elapsedND = table2array(optHistory(:,1));
         x_opt = t_elapsedND .* refVals.T_ref;
@@ -634,12 +463,12 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         tgoStaticAtUpdate = tgoInitial - x_opt;
         tgoDiff = tgoStaticAtUpdate - tgoSolved;
         
-        nexttile; plot(x_opt, gamma_hist, 'LineWidth', 2); title('\gamma_1'); grid on; xlabel('Time s');
-        nexttile; plot(x_opt, gamma2_hist, 'LineWidth', 2); title('\gamma_2'); grid on; xlabel('Time s');
-        nexttile; plot(x_opt, tgoSolved, 'LineWidth', 2); title('t_{go} Solved'); grid on; xlabel('Time s');
-        nexttile; plot(x_opt, c1_norm, 'LineWidth', 2); title('||c_1||'); grid on; xlabel('Time s');
-        nexttile; plot(x_opt, c2_norm, 'LineWidth', 2); title('||c_2||'); grid on; xlabel('Time s');
-        nexttile; stairs(x_opt, tgoDiff, 'LineWidth', 2); title('\Delta t_{go} (Static - ReOpt)'); ylabel('s'); xlabel('Time s'); grid on;
+        subplot(3,2,1); hold on; grid on; plot(x_opt, gamma_hist, 'LineWidth', 2, 'Color', runColor); title('\gamma_1'); grid on; xlabel('Time s');
+        subplot(3,2,2); hold on; grid on; plot(x_opt, gamma2_hist, 'LineWidth', 2, 'Color', runColor); title('\gamma_2'); grid on; xlabel('Time s');
+        subplot(3,2,3); hold on; grid on; plot(x_opt, tgoSolved, 'LineWidth', 2, 'Color', runColor); title('t_{go} Solved'); grid on; xlabel('Time s');
+        subplot(3,2,4); hold on; grid on; plot(x_opt, c1_norm, 'LineWidth', 2, 'Color', runColor); title('||c_1||'); grid on; xlabel('Time s');
+        subplot(3,2,5); hold on; grid on; plot(x_opt, c2_norm, 'LineWidth', 2, 'Color', runColor); title('||c_2||'); grid on; xlabel('Time s');
+        subplot(3,2,6); hold on; grid on; stairs(x_opt, tgoDiff, 'LineWidth', 2, 'Color', runColor); title('\Delta t_{go} (Static - ReOpt)'); ylabel('s'); xlabel('Time s'); grid on;
         
         sgtitle('Optimization Parameters Through Reoptimization');
     end

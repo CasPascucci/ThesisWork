@@ -1,4 +1,6 @@
-clear all; close all; clc; format short
+clear all;  clc; format short
+%close all;
+addpath([pwd, '/CoordinateFunctions']);
 
 %% 1. Initial State Definitions
 % PDI (Powered Descent Initiation) State - Dimensional
@@ -45,46 +47,59 @@ optimizationParams.glideSlopeLow        = 250; % m
 optimizationParams.glideSlopeCutoff     = 50;  % m
 
 % Pointing Constraints
-optimizationParams.pointingEnabled = false;
+optimizationParams.pointingEnabled = true;
 optimizationParams.maxTiltAccel    = 2;  % deg/s^2
 optimizationParams.minPointing     = 10; % deg
 
 % Re-Optimization Settings
 optimizationParams.updateOpt  = true; 
 optimizationParams.updateFreq = 10;   % s
-optimizationParams.updateStop = 30;   % s (Time before landing to stop updates)
+optimizationParams.updateStop = 60;   % s (Time before landing to stop updates)
 
 % Tolerances
 optimizationParams.gamma1eps = 1e-2;
 optimizationParams.gamma2eps = 1e-2;
 
 % Divert
-targetState.divertEnabled = false; % Also requires reopt to be enabled to truly work
-% divertDistances = [0, 50, 100, 150, 200, 300];
-% divert1E = divertDistances';
-% divert1N = zeros(length(divertDistances),1);
-% divert2E = zeros(length(divertDistances),1);
-% divert2N = divertDistances';
-% divert3E = [divertDistances.*cosd(45)]';
-% divert3N = divert3E;
-% targetState.divertPoints = [divert1E, divert1N, zeros(length(divertDistances),1);
-%                             divert2E, divert2N, zeros(length(divertDistances),1);
-%                             divert3E, divert3N, zeros(length(divertDistances),1)];
-targetState.divertPoints = [-150, -300, 0]; % m % Single case, above block is multiple divert plots
-targetState.altDivert = 2000; % m
+targetState.divertEnabled = true; % Also requires reopt to be enabled to truly work
+divertDistances = [100, 200, 300, 500];
+divert1E = divertDistances';
+divert1N = zeros(length(divertDistances),1);
+divert2E = zeros(length(divertDistances),1);
+divert2N = divertDistances';
+divert3E = zeros(length(divertDistances),1);
+divert3N = -divertDistances';
+divert4E = divertDistances'.*cosd(45);
+divert4N = divert4E;
+divert5E = divertDistances'.*cosd(45);
+divert5N = -divert5E;
+targetState.divertPoints = [0, 0, 0;
+                            divert1E, divert1N, zeros(length(divertDistances),1);
+                            divert2E, divert2N, zeros(length(divertDistances),1);
+                            divert3E, divert3N, zeros(length(divertDistances),1);
+                            divert4E, divert4N, zeros(length(divertDistances),1);
+                            divert5E, divert5N, zeros(length(divertDistances),1)];
+% targetState.divertPoints = [-150, -300, 0]; % m % Single case, above block is multiple divert plots
+targetState.altDivert = 1000; % m
 
 %% 3. Execution Flags & Run
-beta          = 0.8;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta          = 0.6;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 runSimulation = true;
 doPlotting    = true; 
 verboseOutput = true;
+timePreParam = toc;
 
-%tic
+if ~ targetState.divertEnabled
 [gammaOpt, gamma2Opt, krOpt, tgoOptSec, ~, ~, optFuelCost, simFuelCost, ...
  aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, ...
  nonDimParams, refVals] = getParams(PDIState, planetaryParams, targetState, ...
     vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
-%toc
+else
+ [gammaOpt, gamma2Opt, krOpt, tgoOptSec, ~, ~, optFuelCost, simFuelCost, ...
+ aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, ...
+ nonDimParams, refVals] = getParamsDIVERT(PDIState, planetaryParams, targetState, ...
+    vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
+end
 
 %% 4. Results Display
 if optimizationParams.updateOpt

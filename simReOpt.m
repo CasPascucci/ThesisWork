@@ -66,7 +66,7 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT impl
 
 % Main loop
     while tgo > updateStopND % keep looping until update stop time
-        segmentCount = segmentCount + 1;
+        segmentCount = segmentCount + 1; % Start a new segment
         tgo_remaining = tgo - updateStopND;
         t_segment = min(tgo,min(updateFreqND, tgo_remaining));
     
@@ -74,7 +74,7 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT impl
             break;
         end
     
-        t_start = t_elapsed;
+        t_start = t_elapsed; % Start segment at total elapsed time
         t_end = t_elapsed + t_segment;
     
         if verboseOutput
@@ -85,7 +85,7 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT impl
         end
         if divertEnabled && ~divertOccured
             odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6, 'Events', eventDivert);
-            [tSeg, stateSeg, tEvent, stateEvent, iEvent] = ode45(@(t, X) trajectorySegmentODE(t, X, t_elapsed, gamma, kr, tgo, ...
+            [tSeg, stateSeg, tEvent, ~, ~] = ode45(@(t, X) trajectorySegmentODE(t, X, t_elapsed, gamma, kr, tgo, ...
                 isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
                 [t_start, t_end], X0, odeoptions);
         else
@@ -93,17 +93,17 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT impl
             [tSeg, stateSeg] = ode45(@(t, X) trajectorySegmentODE(t, X, t_elapsed, gamma, kr, tgo, ...
                 isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
                 [t_start, t_end], X0, odeoptions);
-            tEvent = []; stateEvent = []; iEvent = [];
+            tEvent = [];
         end
 
-        if ~isempty(tEvent)
+        if ~isempty(tEvent) % If divert during this segment
             if verboseOutput
-                fprintf('>> DIVERT TRIGGERED at t=%.2f s (Alt < %.2f m)\n', tEvent(end)*refVals.T_ref, problemParams.altDivert);
+                fprintf('= Divert Triggered at t=%.2f s =\n', tEvent(end)*refVals.T_ref);
             end
             rfStar = divertPoint;
             nonDimParams.rfStarND = divertPoint;
             
-            divertHasOccurred = true;
+            divertOccured = true;
         end
     
         tTraj = [tTraj;tSeg];
@@ -123,13 +123,11 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT impl
         end
         aTList = [aTList, segAT];
     
-        X0 = stateSeg(end,:)';
+        X0 = stateSeg(end,:)'; % Next segment IC is the end of this segment
         ICstates(:,ICcounter) = X0;
         ICcounter = ICcounter + 1;
 
         t_elapsed = tSeg(end);
-    
-        % Decrement TGO naturally
         tgo = tgo - t_segment;
     
         if verboseOutput
@@ -177,66 +175,192 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT impl
         end
     end
     
-    if tgo > 0 % safety check if there is time to do final segment
+    %% Main loop concluded, and updateStop reached
+    if tgo > 0  % safety check if there is time to do final segment
         segmentCount = segmentCount + 1;
-        
+    
         if verboseOutput
             fprintf('--- Final Segment %d (No Re-opt) ---\n', segmentCount);
             fprintf('Integrating final %.2f s to landing\n', tgo * refVals.T_ref);
         end
-        
-        t_start = t_elapsed;
 
-        t_freeze = t_elapsed + (tgo -minTime);
-        t_end = t_elapsed + tgo;
-        [tSeg1, stateSeg1] = ode45(@(t, X) trajectorySegmentODE(t, X, t_elapsed, gamma, kr, tgo, ...
-        isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
-        [t_start, t_freeze], X0, odeoptions);
+        t_start = t_elapsed;
+        t_end    = t_elapsed + tgo;
+        t_freeze = t_end - minTime;
+        if t_freeze < t_start
+            t_freeze = t_start;
+        end
+
+        t_reopt_start1 = t_elapsed;
+        tgo_at_reopt1  = tgo;
+        gamma1 = gamma;
+        kr1    = kr;
+        rfStar1 = rfStar;
     
-        % Compute final thrust acceleration to freeze after minTime
-        r_freeze = stateSeg1(end, 1:3)';
-        v_freeze = stateSeg1(end, 4:6)';
-        m_freeze = stateSeg1(end, 7);
+        % Integrate to freeze, maybe divert
+        if divertEnabled && ~divertOccured
+            odeoptions = odeset('RelTol',1e-6,'AbsTol',1e-6,'Events',eventDivert);
+            [tSeg1, stateSeg1, tEvent1, stateEvent1, ~] = ode45(@(t, X) trajectorySegmentODE( ...
+                t, X, t_elapsed, gamma, kr, tgo, isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
+                [t_start, t_freeze], X0, odeoptions);
+        else
+            odeoptions = odeset('RelTol',1e-6,'AbsTol',1e-6);
+            [tSeg1, stateSeg1] = ode45(@(t, X) trajectorySegmentODE( ...
+                t, X, t_elapsed, gamma, kr, tgo, isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
+                [t_start, t_freeze], X0, odeoptions);
+            tEvent1 = [];
+            stateEvent1 = [];
+        end
+        n1 = length(tSeg1);
+        segAT1 = zeros(3,n1);
+        for i = 1:n1
+            r = stateSeg1(i,1:3)';  v = stateSeg1(i,4:6)';  m = stateSeg1(i,7);
+            tgo_now = tgo_at_reopt1 - (tSeg1(i) - t_reopt_start1);
+            [aTi, limited] = computeAccel(r, v, m, gamma1, kr1, tgo_now, rfStar1, vfStar, afStar, gGuidance, nonDimParams);
+            segAT1(:,i) = aTi;
+            flag_thrustGotLimited = flag_thrustGotLimited || limited;
+        end
+        % Default: no post-divert segment
+        tSeg2 = [];
+        stateSeg2 = [];
+        segAT2 = [];
+    
+        % If divert, reopt and update end/freeze
+        if ~isempty(tEvent1)
+            t_divert = tEvent1(end);
+            X_divert = stateEvent1(end, :)';
+    
+            if verboseOutput
+                fprintf('= Divert Triggered at t=%.2f s (final segment) =\n', t_divert * refVals.T_ref);
+            end
+    
+            % Switch target
+            rfStar = divertPoint;
+            nonDimParams.rfStarND = divertPoint;
+            divertOccured = true;
+    
+            % Update clocks to the divert time
+            dt = t_divert - t_start;
+            t_elapsed = t_divert;
+            tgo = tgo - dt;
+    
+            % Re-optimize at divert
+            newNonDimParams = nonDimParams;
+            newNonDimParams.r0ND = X_divert(1:3);
+            newNonDimParams.v0ND = X_divert(4:6);
+            newNonDimParams.m0ND = X_divert(7);
+    
+            paramsX0 = [gamma, gamma2, tgo];
+    
+            [optParams, ~, ~, ~, ~, ~, exitflag] = optimizationLoop(paramsX0, betaParam, ...
+                problemParams, newNonDimParams, optimizationParams, refVals, delta_t, false, false);
+    
+            if exitflag > 0
+                gamma  = optParams(1);
+                gamma2 = optParams(2);
+                kr     = (gamma2+2)*(gamma+2);
+                tgo    = optParams(3);
+            else
+                if verboseOutput
+                    fprintf('WARNING: Optimization failed at divert (exitflag=%d). Keeping previous parameters and natural tgo.\n', exitflag);
+                end
+            end
+    
+            optHistory = [optHistory; [t_elapsed, gamma, gamma2, kr, tgo]];
+            exitFlags  = [exitFlags; exitflag];
+
+            t_end    = t_elapsed + tgo;
+            t_freeze = t_end - minTime;
+            if t_freeze < t_elapsed
+                t_freeze = t_elapsed;
+            end
+
+            % Integrate post-divert until the updated freeze time
+            if t_freeze > t_elapsed
+                odeoptions = odeset('RelTol',1e-6,'AbsTol',1e-6);
+                t_reopt_start2 = t_elapsed;
+                tgo_at_reopt2  = tgo;
+                gamma2_use = gamma;
+                kr2_use    = kr;
+                rfStar2    = rfStar;
+                [tSeg2, stateSeg2] = ode45(@(t, X) trajectorySegmentODE( ...
+                    t, X, t_elapsed, gamma, kr, tgo, isp, rMoonND, rfStar, vfStar, afStar, gGuidance, nonDimParams), ...
+                    [t_elapsed, t_freeze], X_divert, odeoptions);
+                n2 = length(tSeg2);
+                segAT2_full = zeros(3,n2);
+                for i = 1:n2
+                    r = stateSeg2(i,1:3)';  v = stateSeg2(i,4:6)';  m = stateSeg2(i,7);
+                    tgo_now = tgo_at_reopt2 - (tSeg2(i) - t_reopt_start2);
+                    [aTi, limited] = computeAccel(r, v, m, gamma2_use, kr2_use, tgo_now, rfStar2, vfStar, afStar, gGuidance, nonDimParams);
+                    segAT2_full(:,i) = aTi;
+                    flag_thrustGotLimited = flag_thrustGotLimited || limited;
+                end
+                if n2 >= 2
+                    segAT2 = segAT2_full(:,2:end);
+                else
+                    segAT2 = zeros(3,0);
+                end
+            end
+        end
+    
+        % Determine freeze state
+        if ~isempty(stateSeg2)
+            freezeState = stateSeg2(end, :)';
+            t_freeze_actual = tSeg2(end);
+        else
+            freezeState = stateSeg1(end, :)';
+            t_freeze_actual = tSeg1(end);
+        end
+    
+        % Compute frozen thrust at minTime
+        r_freeze = freezeState(1:3);
+        v_freeze = freezeState(4:6);
+        m_freeze = freezeState(7);
+    
         [aT_frozen, ~] = computeAccel(r_freeze, v_freeze, m_freeze, gamma, kr, ...
             minTime, rfStar, vfStar, afStar, gGuidance, nonDimParams);
-        
-        % Second part: frozen thrust acceleration
-        X0_freeze = stateSeg1(end, :)';
-        [tSeg2, stateSeg2] = ode45(@(t, X) trajectoryFrozenThrust(t, X, aT_frozen, ...
-            isp, rMoonND), [t_freeze, t_end], X0_freeze, odeoptions);
-        
-        % Combine segments
-        tSeg = [tSeg1; tSeg2(2:end)];  % Avoid duplicate point
-        stateSeg = [stateSeg1; stateSeg2(2:end, :)];
-
-
     
-        tTraj = [tTraj;tSeg];
-        stateTraj = [stateTraj; stateSeg];
-        numPoints = length(tSeg);
-        segAT = zeros(3, numPoints);
-        for i = 1:numPoints
-            r = stateSeg(i, 1:3)';
-            v = stateSeg(i, 4:6)';
-            m = stateSeg(i, 7);
-            t_since_reopt = tSeg(i) - t_elapsed;
-            tgo_now = tgo - t_since_reopt;
-            
-            % Use active guidance until threshold, then freeze
-            if tgo_now > minTime
-                [aTi, limited] = computeAccel(r, v, m, gamma, kr, tgo_now, rfStar, vfStar, afStar, gGuidance, nonDimParams);
-                flag_thrustGotLimited = flag_thrustGotLimited || limited;
-            else
-                % Use frozen value (already computed above)
-                aTi = aT_frozen;
-            end
-            segAT(:, i) = aTi;
+        % Frozen thrust from freeze to end time
+        odeoptions = odeset('RelTol',1e-6,'AbsTol',1e-6);
+        if t_end > t_freeze_actual
+            [tSeg3, stateSeg3] = ode45(@(t, X) trajectoryFrozenThrust(t, X, aT_frozen, isp, rMoonND), ...
+                [t_freeze_actual, t_end], freezeState, odeoptions);
+        else
+            tSeg3 = t_freeze_actual;
+            stateSeg3 = freezeState.';
         end
+        n3 = length(tSeg3);
+        if n3 >= 2
+            segAT3 = repmat(aT_frozen, 1, n3-1);
+        else
+            segAT3 = zeros(3,0);
+        end
+        % Combine segments (avoid duplicates)
+        tSeg = tSeg1;
+        stateSeg = stateSeg1;
+        segAT = segAT1;
+    
+        if ~isempty(tSeg2)
+            tSeg = [tSeg; tSeg2(2:end)];
+            stateSeg = [stateSeg; stateSeg2(2:end,:)];
+            segAT = [segAT, segAT2];
+        end
+    
+        if ~isempty(tSeg3)
+            tSeg = [tSeg; tSeg3(2:end)];
+            stateSeg = [stateSeg; stateSeg3(2:end,:)];
+            segAT = [segAT, segAT3];
+        end
+    
+        tTraj = [tTraj; tSeg];
+        stateTraj = [stateTraj; stateSeg];
         aTList = [aTList, segAT];
+
         if verboseOutput
             fprintf('Final segment complete.\n\n');
         end
     end
+
     if verboseOutput
         fprintf('=== Simulation Complete ===\n');
         fprintf('Total elapsed time: %.2f s\n', tTraj(end) * refVals.T_ref);

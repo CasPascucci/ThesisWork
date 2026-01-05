@@ -1,5 +1,5 @@
 function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals] = ...
-    getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation)
+    getParamsDIVERT(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation)
 
     
 
@@ -190,6 +190,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
                 closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
         else
             divertTrajectories = cell(1,size(problemParams.divertPoints, 1));
+            divertMass = [];
             if divertEnabled % Re-Optimization with Divert
                 for idx = 1:size(problemParams.divertPoints, 1)
                     divertPoint = problemParams.divertPoints(idx,:)' ./ refVals.L_ref;
@@ -197,6 +198,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
                     [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
                     simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput, divertPoint);
                     divertTrajectories{idx} = stateTraj(:,1:3);
+                    divertMass(idx) = stateTraj(end,7);
                 end
             else
                 % Re-Optimization Simulation
@@ -217,29 +219,93 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, true);
     end
 
-    %% 7. Plotting
-    if doPlots
-        plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, ...
-            refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, ...
-            secondaryData, optHistory, ICstates, betaParam);
-    end
-
-    %% 8. Divert Plot
+    %% 7. Divert Plot
     if divertEnabled
-        figure(); hold on;
+        % Plot 3D trajectories from 1.5x divert altitude to landing
+        figure('Name', 'Divert Trajectories - 3D'); 
+        hold on; grid on;
+        
+        altThreshold = 1.5 * altDivert; % m (dimensional)
+        altThresholdND = altThreshold / refVals.L_ref; % Non-dimensional
+        
+        colors = lines(size(problemParams.divertPoints, 1));
+        legendEntries = {};
+        
         for idx = 1:size(problemParams.divertPoints, 1)
             traj = divertTrajectories{idx};
-            plot3(traj(:,1),traj(:,2),traj(:,3))
+            
+            % Calculate altitude for each point
+            altitudes = vecnorm(traj, 2, 2) - rPlanetND;
+            
+            % Find indices below threshold altitude
+            belowThreshold = altitudes <= altThresholdND;
+            
+            if any(belowThreshold)
+                trajFiltered = traj(belowThreshold, :);
+                trajENU = zeros(size(trajFiltered));
+                for i = 1:size(trajFiltered, 1)
+                    rMCMF = trajFiltered(i,:)' * refVals.L_ref;
+                    rENU = MCMF2ENU(rMCMF, landingLatDeg, landingLonDeg, true, true);
+                    trajENU(i, :) = rENU';
+                end
+                plot3(trajENU(:,1), trajENU(:,2), trajENU(:,3), ...
+                    'LineWidth', 2, 'Color', colors(idx,:));
+                legendEntries{end+1} = sprintf('Point %d: E=%.0fm, N=%.0fm', ...
+                    idx, problemParams.divertPoints(idx,1), problemParams.divertPoints(idx,2));
+            end
         end
-        xlabel("X");ylabel("Y");xlabel("Z");
-        xlim([-0.2,0.2]);ylim([-0.2,0.2]);zlim([-173.65,-173.6]);
-
-        figure(); hold on;
+        
+        xlabel('East (m)'); ylabel('North (m)'); zlabel('Up (m)');
+        title(sprintf('Divert Trajectories (Below %.0f m altitude)', altThreshold));
+        view([45 36])
+        legend(legendEntries, 'Location', 'best');
+        axis equal;
+        
+        % Plot 2D final landing positions
+        figure('Name', 'Divert Landing Positions - 2D'); 
+        hold on; grid on;
+        
         for idx = 1:size(problemParams.divertPoints, 1)
-            traj = divertTrajectories{idx} * refVals.L_ref;
-            plot(traj(end,1),traj(end,2),'.','MarkerSize',12);
-        end
-        xlabel("X");ylabel("Y");
-    end
+            traj = divertTrajectories{idx} * refVals.L_ref; % Convert to dimensional (MCMF)
+            % Convert final position from MCMF to ENU
+            finalPosMCMF = traj(end, 1:3)';
+            finalPosENU = MCMF2ENU(finalPosMCMF, landingLatDeg, landingLonDeg, true, true);
+            if idx==1
+                plot(finalPosENU(1), finalPosENU(2), 'o', 'MarkerSize', 10, ...
+                'MarkerFaceColor', colors(idx,:), 'MarkerEdgeColor', 'k', 'LineWidth', 1.5);
+            else
+                plot(finalPosENU(1), finalPosENU(2), 'o', 'MarkerSize', 10, ...
+                'MarkerFaceColor', colors(idx,:), 'MarkerEdgeColor', 'k', 'LineWidth', 1.5, 'HandleVisibility','off');
+            end
 
+        end
+        
+        % Plot target divert points for reference
+        for idx = 1:size(problemParams.divertPoints, 1)
+            targetPoint = problemParams.divertPoints(idx, 1:2);
+            plot(targetPoint(1), targetPoint(2), 'x', 'MarkerSize', 15, ...
+                'Color', colors(idx,:), 'LineWidth', 3,'DisplayName',num2str(idx));
+        end
+        
+        xlabel('East (m)'); ylabel('North (m)');
+        title('Final Landing Positions vs Target Divert Points');
+        legend('Actual Landing', 'Target Points', 'Location', 'best');
+        axis equal; grid on;
+        
+        % Print landing errors
+        baseCaseMass = divertMass(1) * refVals.M_ref;
+        fprintf('\n=== Divert Landing Errors ===\n');
+        for idx = 1:size(problemParams.divertPoints, 1)
+            traj = divertTrajectories{idx} * refVals.L_ref; % MCMF coordinates
+            % Convert from MCMF to ENU for error calculation
+            finalPosMCMF = traj(end, 1:3)';
+            finalPosENU = MCMF2ENU(finalPosMCMF, landingLatDeg, landingLonDeg, true, true);
+            targetPos = problemParams.divertPoints(idx, 1:2)';
+            error = norm(finalPosENU(1:2) - targetPos);
+            massDelta = baseCaseMass - divertMass(idx)*refVals.M_ref;
+            fprintf('Point %d (E=%.0fm, N=%.0fm): Error = %.4f m, Increased Fuel Cost: %.1f kg\n', ...
+                idx, targetPos(1), targetPos(2), error, massDelta);
+        end
+        fprintf('=============================\n');
+    end
 end
