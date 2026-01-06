@@ -37,6 +37,8 @@ targetState.delta_t       = 5; % s (BTT parameter, not yet implemented)
 
 %% 2. Optimization Configuration
 optimizationParams = struct;
+optimizationParams.paramsX0 = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, tgo
+% Node Count for Optimization
 optimizationParams.nodeCount = 301; % Must be odd for Simpson's rule
 
 % Glideslope Constraints
@@ -61,8 +63,8 @@ optimizationParams.gamma1eps = 1e-2;
 optimizationParams.gamma2eps = 1e-2;
 
 % Divert
-targetState.divertEnabled = true; % Also requires reopt to be enabled to truly work
-divertDistances = [100, 200, 300, 500];
+targetState.divertEnabled = false; % Requires reopt on, will disable pointing and glideslope if not already done
+divertDistances = [1000, 2000, 3000];
 divert1E = divertDistances';
 divert1N = zeros(length(divertDistances),1);
 divert2E = zeros(length(divertDistances),1);
@@ -73,12 +75,21 @@ divert4E = divertDistances'.*cosd(45);
 divert4N = divert4E;
 divert5E = divertDistances'.*cosd(45);
 divert5N = -divert5E;
+divert6E = -divertDistances'.*cosd(45);
+divert6N = divert6E;
+divert7E = -divertDistances'.*cosd(45);
+divert7N = -divert7E;
+divert8E = -divertDistances';
+divert8N = zeros(length(divertDistances),1);
 targetState.divertPoints = [0, 0, 0;
                             divert1E, divert1N, zeros(length(divertDistances),1);
                             divert2E, divert2N, zeros(length(divertDistances),1);
                             divert3E, divert3N, zeros(length(divertDistances),1);
                             divert4E, divert4N, zeros(length(divertDistances),1);
-                            divert5E, divert5N, zeros(length(divertDistances),1)];
+                            divert5E, divert5N, zeros(length(divertDistances),1);
+                            divert6E, divert6N, zeros(length(divertDistances),1);
+                            divert7E, divert7N, zeros(length(divertDistances),1);
+                            divert8E, divert8N, zeros(length(divertDistances),1)];
 % targetState.divertPoints = [-150, -300, 0]; % m % Single case, above block is multiple divert plots
 targetState.altDivert = 1000; % m
 

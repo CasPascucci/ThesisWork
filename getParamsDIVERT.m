@@ -1,6 +1,10 @@
 function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals] = ...
     getParamsDIVERT(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation)
 
+    if targetState.divertEnabled % Enforce that these constraints don't apply during divert scenarios
+        optimizationParams.glideSlopeEnabled = false;
+        optimizationParams.pointingEnabled = false;
+    end
     
 
     %% 1. Initialization & Defaults
@@ -107,7 +111,8 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
 
     %% 4. Optimization
     
-    paramsX0 = [0.3, 0.4, 9];
+    paramsX0 = optimizationParams.paramsX0;
+    paramsX0(3) = paramsX0(3)/refVals.T_ref;
     reopt = optimizationParams.updateOpt;
     fprintf("=== Starting Optimization ===\n");
     [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
@@ -257,9 +262,10 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         
         xlabel('East (m)'); ylabel('North (m)'); zlabel('Up (m)');
         title(sprintf('Divert Trajectories (Below %.0f m altitude)', altThreshold));
-        view([45 36])
-        legend(legendEntries, 'Location', 'best');
-        axis equal;
+        subtitle("Positive North is Flight Origin");
+        view([51 41]);
+        legend(legendEntries, 'Location', 'bestoutside');
+        %axis equal;
         
         % Plot 2D final landing positions
         figure('Name', 'Divert Landing Positions - 2D'); 

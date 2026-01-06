@@ -383,27 +383,26 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         grid on;
 
         % Figure 12: Pointing Angle Analysis
+    
+        aMag   = vecnorm([aE aN aU], 2, 2);
+        thrustU_ENU = [aE aN aU] ./ aMag;          
+        dotUp       = max(-1, min(1, thrustU_ENU(:,3)));   
+        phiSim      = acosd(dotUp);
+
+        figure(12);
+        set(gcf, 'Name', 'Pointing Analysis');
+        subplot(2,1,1); hold on; grid on;
+        plot(tTraj*T_ref, phiSim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
         if optimParams.pointingEnabled
-            aMag   = vecnorm([aE aN aU], 2, 2);
-            thrustU_ENU = [aE aN aU] ./ aMag;          
-            dotUp       = max(-1, min(1, thrustU_ENU(:,3)));   
-            phiSim      = acosd(dotUp);                         
             phi0_deg   = optimParams.minPointing;
             tgoSim = (tTraj(end) - tTraj) * T_ref; 
             phiA_deg = 0.5 * (optimParams.maxTiltAccel) .* (tgoSim.^2);
             ThetaSim = min(180, phi0_deg + phiA_deg);
-
-            figure(12);
-            set(gcf, 'Name', 'Pointing Analysis');
-
-            
-            subplot(2,1,1); hold on; grid on;
-            plot(tTraj*T_ref, phiSim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
             plot(tTraj*T_ref, ThetaSim, '--', 'Color', runColor, 'LineWidth', 2, 'DisplayName','\Theta Limit');
 
             xlabel('Time s'); ylabel('Angle deg');
             title('Pointing Angle vs Limit');
-            legend('Location','best');
+            legend('Location','bestoutside');
             
             subplot(2,1,2); hold on; grid on;
             plot(tTraj*T_ref, ThetaSim - phiSim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
@@ -412,7 +411,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             end
             xlabel('Time s'); ylabel('deg');
             title('Pointing margin (positive means within limit)');
-            legend('Location','best');
+            legend('Location','bestoutside');
         end
     else
         fprintf('\n=== NOTE: Simulation plots skipped (runSimulation = false) ===\n');
@@ -463,12 +462,12 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         tgoStaticAtUpdate = tgoInitial - x_opt;
         tgoDiff = tgoStaticAtUpdate - tgoSolved;
         
-        subplot(3,2,1); hold on; grid on; plot(x_opt, gamma_hist, 'LineWidth', 2, 'Color', runColor); title('\gamma_1'); grid on; xlabel('Time s');
-        subplot(3,2,2); hold on; grid on; plot(x_opt, gamma2_hist, 'LineWidth', 2, 'Color', runColor); title('\gamma_2'); grid on; xlabel('Time s');
-        subplot(3,2,3); hold on; grid on; plot(x_opt, tgoSolved, 'LineWidth', 2, 'Color', runColor); title('t_{go} Solved'); grid on; xlabel('Time s');
-        subplot(3,2,4); hold on; grid on; plot(x_opt, c1_norm, 'LineWidth', 2, 'Color', runColor); title('||c_1||'); grid on; xlabel('Time s');
-        subplot(3,2,5); hold on; grid on; plot(x_opt, c2_norm, 'LineWidth', 2, 'Color', runColor); title('||c_2||'); grid on; xlabel('Time s');
-        subplot(3,2,6); hold on; grid on; stairs(x_opt, tgoDiff, 'LineWidth', 2, 'Color', runColor); title('\Delta t_{go} (Static - ReOpt)'); ylabel('s'); xlabel('Time s'); grid on;
+        subplot(3,2,1); hold on; grid on; plot(x_opt, gamma_hist, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('\gamma_1'); grid on; xlabel('Time s'); legend('Location','northwest');
+        subplot(3,2,2); hold on; grid on; plot(x_opt, gamma2_hist, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('\gamma_2'); grid on; xlabel('Time s');
+        subplot(3,2,3); hold on; grid on; plot(x_opt, tgoSolved, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('t_{go} Solved'); grid on; xlabel('Time s');
+        subplot(3,2,4); hold on; grid on; plot(x_opt, c1_norm, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('||c_1||'); grid on; xlabel('Time s');
+        subplot(3,2,5); hold on; grid on; plot(x_opt, c2_norm, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('||c_2||'); grid on; xlabel('Time s');
+        subplot(3,2,6); hold on; grid on; stairs(x_opt, tgoDiff, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('\Delta t_{go} (Static - ReOpt)'); ylabel('s'); xlabel('Time s'); grid on;
         
         sgtitle('Optimization Parameters Through Reoptimization');
     end

@@ -107,7 +107,8 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
 
     %% 4. Optimization
     
-    paramsX0 = [0.3, 0.4, 9];
+    paramsX0 = optimizationParams.paramsX0;
+    paramsX0(3) = paramsX0(3)/refVals.T_ref;
     reopt = optimizationParams.updateOpt;
     fprintf("=== Starting Optimization ===\n");
     [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
