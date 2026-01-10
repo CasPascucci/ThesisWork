@@ -49,38 +49,42 @@ optimizationParams.glideSlopeLow        = 250; % m
 optimizationParams.glideSlopeCutoff     = 50;  % m
 
 % Pointing Constraints
-optimizationParams.pointingEnabled = true;
+optimizationParams.pointingEnabled = false;
 optimizationParams.maxTiltAccel    = 2;  % deg/s^2
 optimizationParams.minPointing     = 10; % deg
 
 % Re-Optimization Settings
 optimizationParams.updateOpt  = true; 
 optimizationParams.updateFreq = 10;   % s
-optimizationParams.updateStop = 60;   % s (Time before landing to stop updates)
+optimizationParams.updateStop = 120;   % s (Time before landing to stop updates)
 
 % Tolerances
 optimizationParams.gamma1eps = 1e-2;
 optimizationParams.gamma2eps = 1e-2;
 
 % Divert
-targetState.divertEnabled = false; % Requires reopt on, will disable pointing and glideslope if not already done
+targetState.divertEnabled = true; % Requires reopt on, will disable pointing and glideslope if not already done, and will enable Re-Opt
 divertDistances = [1000, 2000, 3000];
-divert1E = divertDistances';
-divert1N = zeros(length(divertDistances),1);
-divert2E = zeros(length(divertDistances),1);
-divert2N = divertDistances';
-divert3E = zeros(length(divertDistances),1);
-divert3N = -divertDistances';
+
+divert1E = zeros(length(divertDistances),1);
+divert1N = divertDistances';
+divert2E = divertDistances'.*cosd(45);
+divert2N = divert2E;
+divert3E = divertDistances';
+divert3N = zeros(length(divertDistances),1);
 divert4E = divertDistances'.*cosd(45);
-divert4N = divert4E;
-divert5E = divertDistances'.*cosd(45);
-divert5N = -divert5E;
+divert4N = -divert4E;
+divert5E = zeros(length(divertDistances),1);
+divert5N = -divertDistances';
 divert6E = -divertDistances'.*cosd(45);
 divert6N = divert6E;
-divert7E = -divertDistances'.*cosd(45);
-divert7N = -divert7E;
-divert8E = -divertDistances';
-divert8N = zeros(length(divertDistances),1);
+divert7E = -divertDistances';
+divert7N = zeros(length(divertDistances),1);
+divert8E = -divertDistances'.*cosd(45);
+divert8N = -divert8E;
+
+
+
 targetState.divertPoints = [0, 0, 0;
                             divert1E, divert1N, zeros(length(divertDistances),1);
                             divert2E, divert2N, zeros(length(divertDistances),1);
@@ -94,7 +98,7 @@ targetState.divertPoints = [0, 0, 0;
 targetState.altDivert = 1000; % m
 
 %% 3. Execution Flags & Run
-beta          = 0.6;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta          = 0.75;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 runSimulation = true;
 doPlotting    = true; 
 verboseOutput = true;

@@ -1,9 +1,10 @@
 function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals] = ...
     getParamsDIVERT(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation)
 
-    if targetState.divertEnabled % Enforce that these constraints don't apply during divert scenarios
+    if targetState.divertEnabled % Enforce that these constraints don't apply during divert scenarios, and that reopt is enabled
         optimizationParams.glideSlopeEnabled = false;
         optimizationParams.pointingEnabled = false;
+        optimizationParams.updateOpt = true;
     end
     
 
@@ -129,55 +130,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     tgoOpt = optParams(3) * T_ref;
     optFuelCost = (mOptim(end)-mOptim(1))*M_ref;
 
-    %% 5. Comparison/Secondary Data Generation (Static or Unconstrained)
-    % Generates a secondary dataset for plotting comparisons.
-    needsSecondary = doPlots && ~dispersion;
-    secondaryData = struct();
-
-    if needsSecondary
-        if reopt
-            % Mode 1: Re-Opt is Enabled. 
-            % Secondary Data = Static Baseline (Same params, no updates).
-            if verboseOutput; fprintf("\nStatic Trajectory\n"); end
-            
-            optParamsSec = optParams;
-            optCostSec   = optCost;
-            aTOptimSec   = aTOptim;
-            mOptimSec    = mOptim;
-            rdOptimSec   = rdOptim;
-            vdOptimSec   = vdOptim;
-            
-            [tTrajSec, stateTrajSec, aTListSec, flag_thrustGotLimitedSec] = ...
-                closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
-                
-        else
-            % Mode 2: Re-Opt is Disabled (Single Run).
-            % Secondary Data = Unconstrained Optimization (No glideslope/pointing).
-            if verboseOutput; fprintf("Unconstrained Trajectory\n"); end
-            
-            optimizationParamsUC = optimizationParams;
-            optimizationParamsUC.glideSlopeEnabled = false;
-            optimizationParamsUC.pointingEnabled = false;
-            
-            [optParamsSec, optCostSec, aTOptimSec, mOptimSec, rdOptimSec, vdOptimSec] = ...
-                optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParamsUC, refVals, delta_tND, false, false);
-                
-            gammaOptSec = optParamsSec(1);
-            gamma2OptSec = optParamsSec(2);
-            tgoOptSec = optParamsSec(3) * T_ref;
-            
-            [tTrajSec, stateTrajSec, aTListSec, flag_thrustGotLimitedSec] = ...
-                closedLoopSim(gammaOptSec, gamma2OptSec, tgoOptSec/T_ref, problemParams, nonDimParams, refVals, delta_tND);
-        end
-        
-        % Pack Secondary Data Structure
-        secondaryData = struct('tTraj', tTrajSec, 'stateTraj', stateTrajSec, 'optParams', optParamsSec, ...
-                              'optCost', optCostSec, 'aTOptim', aTOptimSec, 'mOptim', mOptimSec, ...
-                              'rdOptim', rdOptimSec, 'vdOptim', vdOptimSec, 'aTList', aTListSec, ...
-                              'flag_thrustGotLimited', flag_thrustGotLimitedSec);
-    end
-
-    %% 6. Simulation
+    %% 5. Simulation
     tTraj = [];
     stateTraj = [];
     aTSim = [];
@@ -188,43 +141,40 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     ICstates = [];
     exitFlags = [];
 
-    if runSimulation
-        if ~reopt
-            % Static Simulation
-            [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = ...
-                closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
-        else
-            divertTrajectories = cell(1,size(problemParams.divertPoints, 1));
-            divertMass = [];
-            if divertEnabled % Re-Optimization with Divert
-                for idx = 1:size(problemParams.divertPoints, 1)
-                    divertPoint = problemParams.divertPoints(idx,:)' ./ refVals.L_ref;
-                    divertPoint = ENU2MCMF(divertPoint, landingLatDeg, landingLonDeg, true);
-                    [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
-                    simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput, divertPoint);
-                    divertTrajectories{idx} = stateTraj(:,1:3);
-                    divertMass(idx) = stateTraj(end,7);
-                end
-            else
-                % Re-Optimization Simulation
-                [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
-                    simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
-            end
-            
-            % Format History Output
-            if ~isempty(optHistory)
-                optHistory = array2table(optHistory);
-                optHistory.Properties.VariableNames(1:5) = {'t_elapsedND','gamma1','gamma2','kr','tgoND'};
-                ICstates = array2table(ICstates');
-                ICstates.Properties.VariableNames(1:7) = {'r0_X', 'r0_Y', 'r0_Z', 'v0_X', 'v0_Y', 'v0_Z', 'm0'};
-            end
-        end
-        
-        simFuelCost = M_ref * (stateTraj(1,7) - stateTraj(end,7));
-        finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, true);
-    end
+    divertData = cell(1,size(problemParams.divertPoints, 1));
 
-    %% 7. Divert Plot
+    
+    if divertEnabled % Re-Optimization with Divert
+        for idx = 1:size(problemParams.divertPoints, 1)
+            divertPoint = problemParams.divertPoints(idx,:)' ./ refVals.L_ref;
+            divertPoint = ENU2MCMF(divertPoint, landingLatDeg, landingLonDeg, true);
+            [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
+            simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput, divertPoint);
+
+            divertData{idx}.tTraj = tTraj;
+            divertData{idx}.stateTraj = stateTraj;
+            divertData{idx}.aTSim = aTSim;
+            divertData{idx}.optHistory = optHistory;
+        end
+    else
+        % Re-Optimization Simulation
+        [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
+            simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
+    end
+    
+    % Format History Output
+    if ~isempty(optHistory)
+        optHistory = array2table(optHistory);
+        optHistory.Properties.VariableNames(1:5) = {'t_elapsedND','gamma1','gamma2','kr','tgoND'};
+        ICstates = array2table(ICstates');
+        ICstates.Properties.VariableNames(1:7) = {'r0_X', 'r0_Y', 'r0_Z', 'v0_X', 'v0_Y', 'v0_Z', 'm0'};
+    end
+    
+    simFuelCost = M_ref * (stateTraj(1,7) - stateTraj(end,7));
+    finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, true);
+
+
+    %% 6. Divert Plot
     if divertEnabled
         % Plot 3D trajectories from 1.5x divert altitude to landing
         figure('Name', 'Divert Trajectories - 3D'); 
@@ -237,7 +187,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         legendEntries = {};
         
         for idx = 1:size(problemParams.divertPoints, 1)
-            traj = divertTrajectories{idx};
+            traj = divertData{idx}.stateTraj(:,1:3);
             
             % Calculate altitude for each point
             altitudes = vecnorm(traj, 2, 2) - rPlanetND;
@@ -265,14 +215,13 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         subtitle("Positive North is Flight Origin");
         view([51 41]);
         legend(legendEntries, 'Location', 'bestoutside');
-        %axis equal;
         
         % Plot 2D final landing positions
         figure('Name', 'Divert Landing Positions - 2D'); 
         hold on; grid on;
         
         for idx = 1:size(problemParams.divertPoints, 1)
-            traj = divertTrajectories{idx} * refVals.L_ref; % Convert to dimensional (MCMF)
+            traj = divertData{idx}.stateTraj(:,1:3) * refVals.L_ref; % Convert to dimensional (MCMF)
             % Convert final position from MCMF to ENU
             finalPosMCMF = traj(end, 1:3)';
             finalPosENU = MCMF2ENU(finalPosMCMF, landingLatDeg, landingLonDeg, true, true);
@@ -298,20 +247,157 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         legend('Actual Landing', 'Target Points', 'Location', 'best');
         axis equal; grid on;
         
-        % Print landing errors
-        baseCaseMass = divertMass(1) * refVals.M_ref;
+        % Print divert info
+        baseCaseMass = divertData{1}.stateTraj(end,7) * refVals.M_ref;
+        baseCaseTOF = divertData{1}.tTraj(end) * refVals.T_ref;
         fprintf('\n=== Divert Landing Errors ===\n');
         for idx = 1:size(problemParams.divertPoints, 1)
-            traj = divertTrajectories{idx} * refVals.L_ref; % MCMF coordinates
+            traj = divertData{idx}.stateTraj(:,1:3) * refVals.L_ref; % MCMF coordinates
             % Convert from MCMF to ENU for error calculation
             finalPosMCMF = traj(end, 1:3)';
             finalPosENU = MCMF2ENU(finalPosMCMF, landingLatDeg, landingLonDeg, true, true);
             targetPos = problemParams.divertPoints(idx, 1:2)';
             error = norm(finalPosENU(1:2) - targetPos);
-            massDelta = baseCaseMass - divertMass(idx)*refVals.M_ref;
-            fprintf('Point %d (E=%.0fm, N=%.0fm): Error = %.4f m, Increased Fuel Cost: %.1f kg\n', ...
-                idx, targetPos(1), targetPos(2), error, massDelta);
+            massDelta = divertData{idx}.stateTraj(end,7)*refVals.M_ref - baseCaseMass;
+            TOFDelta = divertData{idx}.tTraj(end)*refVals.T_ref - baseCaseTOF;
+            fprintf('Point %d (E=%.0fm, N=%.0fm): Error = %.4f m, Increased Fuel Cost: %.1f kg, Increased TOF: %.1f s\n', ...
+                idx, targetPos(1), targetPos(2), error, massDelta, TOFDelta);
         end
         fprintf('=============================\n');
-    end
+
+        % Plot Throttle Profiles
+        figure('Name', 'Divert Throttle Profiles');
+        nPoints = size(problemParams.divertPoints,1);
+
+        nSubplots = 8;
+
+        nCols = ceil(sqrt(nSubplots));
+        nRows = ceil(nSubplots/nCols);
+        currentSub = 0;
+
+        % Pre Solve base case to be used on all plots
+
+        baseData = divertData{1};
+        baseT = baseData.tTraj * refVals.T_ref;
+        baseRad = baseData.stateTraj(:,1:3);
+        baseMass = baseData.stateTraj(:,7);
+        baseAcc = baseData.aTSim;
+
+        baseAlt = (vecnorm(baseRad, 2, 2) - rPlanetND) * refVals.L_ref;
+        baseMask = baseAlt <= problemParams.altDivert;
+        if any(baseMask)
+            baseAMag = vecnorm(baseAcc, 2, 1)';
+            baseThrottle = (baseMass(baseMask) .* baseAMag(baseMask)) ./nonDimParams.maxThrustND * 100;
+            baseTime = baseT(baseMask);
+        else
+            baseThrottle = [];
+            baseTime = [];
+        end
+
+        for idx = 1:nPoints
+            if idx <= 4 % new sub plot every 3 indices (arm of divert star), but 1st has 4 as it default includes base case, others get base case added
+                neededSub = 1; 
+            else
+                neededSub = 1 + ceil((idx-4) /3);
+            end
+            if neededSub > currentSub
+                currentSub = neededSub;
+                subplot(nRows, nCols, currentSub);
+                hold on; grid on;
+                xlabel('Time (s)'); ylabel('Throttle (%)');
+                ylim([0 105]);
+
+                if currentSub == 1
+                    title(sprintf('Center & Arm 1 (Pts 1-%d)', min(4, nPoints)));
+                else
+                    pStart = 5 + (currentSub-2)*3;
+                    pEnd = min(pStart+2, nPoints);
+                    title(sprintf('Arm %d (Pts %d-%d)', currentSub, pStart, pEnd));
+
+                    if ~isempty(baseTime)
+                        plot(baseTime, baseThrottle, 'k--', 'LineWidth', 1.5, 'DisplayName',' Original Trajectory');
+                    end
+                end
+            end
+             tTraj = divertData{idx}.tTraj;
+             mass = divertData{idx}.stateTraj(:,7);
+             aT = divertData{idx}.aTSim;
+             r = divertData{idx}.stateTraj(:,1:3);
+             tDim = tTraj * refVals.T_ref;
+
+             rMagND = vecnorm(r, 2, 2);
+             altDim = (rMagND - rPlanetND) * refVals.L_ref;
+
+             mask = altDim <= problemParams.altDivert;
+
+             if any(mask)
+                 aTMag = vecnorm(aT, 2, 1)';
+                 throttle = (mass(mask) .* aTMag(mask)) ./ (nonDimParams.maxThrustND) * 100;
+
+                 if idx == 1
+                     plot(tDim(mask), throttle, 'k--', 'LineWidth', 1.5, 'DisplayName', 'Original Trajectory');
+                 else
+                     plot(tDim(mask), throttle, 'LineWidth', 2, 'DisplayName', sprintf('Pt %d', idx), 'Color',colors(idx,:));
+                 end
+             end
+             legend('Location','best');
+        end
+        sgtitle(sprintf('Throttle Profiles (Post-Divert, <%.0fm)', altDivert));
+
+        % Plot Gamma1 vs Gamma2
+        figure('Name','Gamma 1 vs Gamma 2 History');
+        baseHist = divertData{1}.optHistory;
+        if ~isempty(baseHist)
+            baseG1 = baseHist(:,2);
+            baseG2 = baseHist(:,3);
+        else
+            baseG1 = []; baseG2 = [];
+        end
+
+        currentSub = 0;
+
+        for idx = 1:nPoints
+            if idx <= 4
+                neededSub = 1;
+            else
+                neededSub = 1 +ceil((idx-4) /3);
+            end
+
+            if neededSub > currentSub
+                currentSub = neededSub;
+                subplot(nRows, nCols, currentSub);
+                hold on; grid on;
+                xlabel('Gamma 1'); ylabel('Gamma 2');
+
+                if currentSub==1
+                    title(sprintf('Center & Arms 1 (Pts 1-%d)', min(4, nPoints)));
+                else
+                    pStart = 5 + (currentSub-2)*3;
+                    pEnd = min(pStart+2, nPoints);
+                    title(sprintf('Arm %d (Pts %d-%d)', currentSub, pStart, pEnd));
+
+                    if ~isempty(baseG1)
+                       hBase = plot(baseG1, baseG2, 'k--', 'LineWidth', 2.5, 'DisplayName', 'Original Trajectory');
+                    end
+                end
+            end
+
+            currHist = divertData{idx}.optHistory;
+            if ~isempty(currHist)
+                g1 = currHist(:,2);
+                g2 = currHist(:,3);
+
+                if idx == 1
+                    hBase = plot(g1, g2, 'k--', 'LineWidth',1.5, 'DisplayName', 'Original Trajectory');
+                else
+                    plot(g1, g2, 'LineWidth', 2, 'Color',colors(idx,:), 'DisplayName', sprintf('Pt %d', idx));
+                end
+            end
+            isLastinSub = (idx == 4)|| (idx > 4 && mod(idx-4, 3) == 0) || (idx == nPoints);
+            if isLastinSub
+                uistack(hBase, 'top');
+            end
+            legend('Location','best');
+        end
+        sgtitle('Parameter Evolution During Divert (Gamma 1 vs Gamma 2');
 end
