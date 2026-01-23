@@ -61,7 +61,11 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     
         [c, ~] = nonlincon(optParams);
         activeIneq = find(c >= -1e-6); % Nearly active
+        activeIneqString = strjoin(string(activeIneq),', ');
         fprintf('\nActive inequality constraints: %d/%d\n', length(activeIneq), length(c));
+        if ~isempty(activeIneq)
+            fprintf("Constraints #: %s\n", activeIneqString);
+        end
         [maxViolation, idx] = max(c);
         fprintf('Max violation: %.3f at constraint %d\n', maxViolation, idx);
     end
@@ -167,7 +171,6 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     else
         margin_top = 1.00;
     end
-
     nThrustCon = 2 * nodeCount;
     nGlideCon = 0;
     nPointCon = 0;

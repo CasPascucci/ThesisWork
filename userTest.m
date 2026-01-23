@@ -5,7 +5,10 @@ addpath([pwd, '/CoordinateFunctions']);
 %% 1. Initial State Definitions
 % PDI (Powered Descent Initiation) State - Dimensional
 PDIState = struct;
-PDIState.altitude           = 15240;   % m
+PDIState.altitude           = 15240;   % This Altitude value matches the altitude value in prior Dr. Lu works
+%PDIState.altitude           = 13360;   % This Altitude value matches the planetary radius in prior Dr. Lu works, better for comparison
+% ABOVE ALTITUDE DOES NOT MATCH RADII AT LANDING AND SO APPEARS
+% ARTIFICIALLY EFFICIENT COMPARED TO G-POLAR BANG BANG
 PDIState.lonInitDeg         = 41.85;   % deg
 PDIState.latInitDeg         = -71.59;  % deg
 PDIState.inertialVelocity   = 1693.8;  % m/s
@@ -98,7 +101,7 @@ targetState.divertPoints = [0, 0, 0;
 targetState.altDivert = 1000; % m
 
 %% 3. Execution Flags & Run
-beta          = 0.75;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta          = 0.6;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 runSimulation = true;
 doPlotting    = true; 
 verboseOutput = true;
@@ -107,7 +110,7 @@ timePreParam = toc;
 if ~ targetState.divertEnabled
 [gammaOpt, gamma2Opt, krOpt, tgoOptSec, ~, ~, optFuelCost, simFuelCost, ...
  aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, ...
- nonDimParams, refVals] = getParams(PDIState, planetaryParams, targetState, ...
+ nonDimParams, refVals, optTable, simTable] = getParams(PDIState, planetaryParams, targetState, ...
     vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
 else
  [gammaOpt, gamma2Opt, krOpt, tgoOptSec, ~, ~, optFuelCost, simFuelCost, ...
@@ -128,6 +131,7 @@ fprintf('Kr:          %.4f\n', krOpt);
 fprintf('Tgo (sec):   %.2f\n', tgoOptSec);
 fprintf('Opt Cost:    %.2f kg\n', optFuelCost);
 fprintf('Sim Cost:    %.2f kg\n', simFuelCost);
+table(optTable,simTable, 'VariableNames',["Optimization", "Simulation"],'RowNames',["Landing Error", "Fuel Cost"])
 
 %% 5. Single Segment Re-Run
 % Use this block to isolate and troubleshoot specific re-optimization segments

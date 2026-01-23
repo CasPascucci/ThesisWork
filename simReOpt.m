@@ -151,9 +151,12 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT impl
         if verboseOutput
             fprintf('\nRe-optimizing at t=%.2f s (tgo=%.2f s)...\n', t_elapsed * refVals.T_ref, tgo * refVals.T_ref);
         end
-
+        
+        ReOptTimer = tic;
         [optParams, ~, ~, ~, ~, ~, exitflag] = optimizationLoop(paramsX0, betaParam, ...
             problemParams, newNonDimParams, optimizationParams, refVals, delta_t, false, false);
+        ReOptTime = toc(ReOptTimer);
+        fprintf("ReOpt time: %.3fs\n",ReOptTime);
         if exitflag > 0
             gamma = optParams(1);
             gamma2 = optParams(2);

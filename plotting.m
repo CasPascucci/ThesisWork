@@ -1,4 +1,4 @@
-function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, secondaryData, optHistory, ICstates, betaParam)
+function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTList, refVals, problemParams, nonDimParams, optimParams, flag_thrustGotLimited, optHistory, ICstates, betaParam)
 
 
     %% Preprocess
@@ -6,7 +6,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     
     descString = string.empty;
     
-    descString(end+1) = sprintf("Beta: %.1f", betaParam);
+    descString(end+1) = sprintf("Beta: %.2f", betaParam);
     if optimParams.updateOpt
         descString(end+1) = "ReOpt";
     else
@@ -303,6 +303,9 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         figure(7); hold on; grid on;
         set(gcf, 'Name', 'Sim Range vs Altitude');
         plot(arcLength/1000, alt_m/1000, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+        if norm([alt_m(end), arcLength(end)]) > 1
+            fprintf("Landing site error > 1m: %.2fm\n", norm([alt_m(end), arcLength(end)]));
+        end
 
         xlabel('Range (km)'); ylabel('Up (km)');
         title('Sim Range vs Altitude'); grid on;
@@ -409,10 +412,11 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             if isempty(findobj(gca, 'DisplayName', 'Zero'))
                  yline(0, 'k-', 'HandleVisibility', 'off');
             end
+
+        end
             xlabel('Time s'); ylabel('deg');
             title('Pointing margin (positive means within limit)');
             legend('Location','bestoutside');
-        end
     else
         fprintf('\n=== NOTE: Simulation plots skipped (runSimulation = false) ===\n');
     end

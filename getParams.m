@@ -1,4 +1,4 @@
-function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals] = ...
+function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals, optTable, simTable] = ...
     getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation)
 
     
@@ -111,8 +111,11 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     paramsX0(3) = paramsX0(3)/refVals.T_ref;
     reopt = optimizationParams.updateOpt;
     fprintf("=== Starting Optimization ===\n");
+    OptTimer = tic;
     [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
         optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
+    optTime = toc(OptTimer);
+    fprintf("Optimization Time: %.3fs\n", optTime);
     if exitflag ~= 1
         fprintf("\n First Optimization Converged to flag ~=1, rerunning optimization starting from first rounds parameters:\n");
         [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
@@ -124,54 +127,6 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     krOpt = (gamma2Opt+2)*(gammaOpt+2);
     tgoOpt = optParams(3) * T_ref;
     optFuelCost = (mOptim(end)-mOptim(1))*M_ref;
-
-    %% 5. Comparison/Secondary Data Generation (Static or Unconstrained)
-    % Generates a secondary dataset for plotting comparisons.
-    needsSecondary = doPlots && ~dispersion;
-    secondaryData = struct();
-
-    if needsSecondary
-        if reopt
-            % Mode 1: Re-Opt is Enabled. 
-            % Secondary Data = Static Baseline (Same params, no updates).
-            if verboseOutput; fprintf("\nStatic Trajectory\n"); end
-            
-            optParamsSec = optParams;
-            optCostSec   = optCost;
-            aTOptimSec   = aTOptim;
-            mOptimSec    = mOptim;
-            rdOptimSec   = rdOptim;
-            vdOptimSec   = vdOptim;
-            
-            [tTrajSec, stateTrajSec, aTListSec, flag_thrustGotLimitedSec] = ...
-                closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
-                
-        else
-            % Mode 2: Re-Opt is Disabled (Single Run).
-            % Secondary Data = Unconstrained Optimization (No glideslope/pointing).
-            if verboseOutput; fprintf("Unconstrained Trajectory\n"); end
-            
-            optimizationParamsUC = optimizationParams;
-            optimizationParamsUC.glideSlopeEnabled = false;
-            optimizationParamsUC.pointingEnabled = false;
-            
-            [optParamsSec, optCostSec, aTOptimSec, mOptimSec, rdOptimSec, vdOptimSec] = ...
-                optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParamsUC, refVals, delta_tND, false, false);
-                
-            gammaOptSec = optParamsSec(1);
-            gamma2OptSec = optParamsSec(2);
-            tgoOptSec = optParamsSec(3) * T_ref;
-            
-            [tTrajSec, stateTrajSec, aTListSec, flag_thrustGotLimitedSec] = ...
-                closedLoopSim(gammaOptSec, gamma2OptSec, tgoOptSec/T_ref, problemParams, nonDimParams, refVals, delta_tND);
-        end
-        
-        % Pack Secondary Data Structure
-        secondaryData = struct('tTraj', tTrajSec, 'stateTraj', stateTrajSec, 'optParams', optParamsSec, ...
-                              'optCost', optCostSec, 'aTOptim', aTOptimSec, 'mOptim', mOptimSec, ...
-                              'rdOptim', rdOptimSec, 'vdOptim', vdOptimSec, 'aTList', aTListSec, ...
-                              'flag_thrustGotLimited', flag_thrustGotLimitedSec);
-    end
 
     %% 6. Simulation
     tTraj = [];
@@ -218,11 +173,14 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, true);
     end
 
+    if flag_thrustGotLimited
+        fprintf("Simulation Trajectory Thrust Limited!\n")
+    end
     %% 7. Plotting
     if doPlots
         plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, ...
             refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, ...
-            secondaryData, optHistory, ICstates, betaParam);
+            optHistory, ICstates, betaParam);
     end
 
     %% 8. Divert Plot
@@ -242,5 +200,10 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         end
         xlabel("X");ylabel("Y");
     end
-
+optError = MCMF2ENU(rdOptim(:,1), landingLatDeg,landingLonDeg,true,false);
+optErrorNorm = norm(rfLanding*refVals.L_ref - optError*refVals.L_ref);
+simError = MCMF2ENU(stateTraj(end,1:3)', landingLatDeg,landingLonDeg,true,false);
+simErrorNorm = norm(rfLanding*refVals.L_ref - simError*refVals.L_ref);
+optTable = [optErrorNorm; optFuelCost];
+simTable = [simErrorNorm; simFuelCost];
 end
