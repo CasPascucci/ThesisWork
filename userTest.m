@@ -97,7 +97,7 @@ targetState.divertPoints = [0, 0, 0;
                             divert6E, divert6N, zeros(length(divertDistances),1);
                             divert7E, divert7N, zeros(length(divertDistances),1);
                             divert8E, divert8N, zeros(length(divertDistances),1)];
-% targetState.divertPoints = [-150, -300, 0]; % m % Single case, above block is multiple divert plots
+%targetState.divertPoints = [-150, -300, 0]; % m % Single case, above block is multiple divert plots
 targetState.altDivert = 1000; % m
 
 %% 3. Execution Flags & Run
@@ -131,7 +131,9 @@ fprintf('Kr:          %.4f\n', krOpt);
 fprintf('Tgo (sec):   %.2f\n', tgoOptSec);
 fprintf('Opt Cost:    %.2f kg\n', optFuelCost);
 fprintf('Sim Cost:    %.2f kg\n', simFuelCost);
-table(optTable,simTable, 'VariableNames',["Optimization", "Simulation"],'RowNames',["Landing Error", "Fuel Cost"])
+if exist("optTable","var")
+    table(optTable,simTable, 'VariableNames',["Optimization", "Simulation"],'RowNames',["Landing Error", "Fuel Cost"]);
+end
 
 %% 5. Single Segment Re-Run
 % Use this block to isolate and troubleshoot specific re-optimization segments

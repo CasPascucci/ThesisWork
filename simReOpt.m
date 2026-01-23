@@ -176,6 +176,12 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT impl
             fprintf('New parameters: gamma=%.4f, gamma2=%.4f, kr=%.4f, tgo=%.2f s (exitflag=%d)\n\n', ...
                 gamma, gamma2, kr, tgo * refVals.T_ref, exitflag);
         end
+        if divertOccured
+            if verboseOutput
+                fprintf('Divert occurred, stopping reoptimization.\n');
+            end
+            break;
+        end
     end
     
     %% Main loop concluded, and updateStop reached

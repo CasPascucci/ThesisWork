@@ -143,24 +143,19 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
 
     divertData = cell(1,size(problemParams.divertPoints, 1));
 
-    
-    if divertEnabled % Re-Optimization with Divert
-        for idx = 1:size(problemParams.divertPoints, 1)
-            divertPoint = problemParams.divertPoints(idx,:)' ./ refVals.L_ref;
-            divertPoint = ENU2MCMF(divertPoint, landingLatDeg, landingLonDeg, true);
-            [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
-            simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput, divertPoint);
 
-            divertData{idx}.tTraj = tTraj;
-            divertData{idx}.stateTraj = stateTraj;
-            divertData{idx}.aTSim = aTSim;
-            divertData{idx}.optHistory = optHistory;
-        end
-    else
-        % Re-Optimization Simulation
+    for idx = 1:size(problemParams.divertPoints, 1)
+        divertPoint = problemParams.divertPoints(idx,:)' ./ refVals.L_ref;
+        divertPoint = ENU2MCMF(divertPoint, landingLatDeg, landingLonDeg, true);
         [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
-            simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
+        simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput, divertPoint);
+
+        divertData{idx}.tTraj = tTraj;
+        divertData{idx}.stateTraj = stateTraj;
+        divertData{idx}.aTSim = aTSim;
+        divertData{idx}.optHistory = optHistory;
     end
+
     
     % Format History Output
     if ~isempty(optHistory)
@@ -272,200 +267,89 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
 
         % Plot Throttle Profiles
         figure('Name', 'Divert Throttle Profiles');
-        nPoints = size(problemParams.divertPoints,1);
+        hold on; grid on;
+        title(sprintf('Throttle Profiles (Post-Divert, <%.0fm)', altDivert));
+        ylim([ 0 105]);
+        xlabel("Time (s)"); ylabel("Throttle (%)");
 
-        nSubplots = 8;
+        for idx = 1:size(problemParams.divertPoints, 1)
+            tTraj = divertData{idx}.tTraj;
+            mass = divertData{idx}.stateTraj(:,7);
+            aT = divertData{idx}.aTSim;
+            r = divertData{idx}.stateTraj(:,1:3);
+            tDim = tTraj * refVals.T_ref;
 
-        nCols = ceil(sqrt(nSubplots));
-        nRows = ceil(nSubplots/nCols);
-        currentSub = 0;
+            rMagND = vecnorm(r, 2, 2);
+            altDim = (rMagND - rPlanetND) * refVals.L_ref;
+            mask = altDim <= problemParams.altDivert;
 
-        % Pre Solve base case to be used on all plots
+            if any(mask)
+                aTMag = vecnorm(aT, 2, 1)';
+                throttle = (mass(mask) .* aTMag(mask)) ./ (nonDimParams.maxThrustND) * 100;
 
-        baseData = divertData{1};
-        baseT = baseData.tTraj * refVals.T_ref;
-        baseRad = baseData.stateTraj(:,1:3);
-        baseMass = baseData.stateTraj(:,7);
-        baseAcc = baseData.aTSim;
-
-        baseAlt = (vecnorm(baseRad, 2, 2) - rPlanetND) * refVals.L_ref;
-        baseMask = baseAlt <= problemParams.altDivert;
-        if any(baseMask)
-            baseAMag = vecnorm(baseAcc, 2, 1)';
-            baseThrottle = (baseMass(baseMask) .* baseAMag(baseMask)) ./nonDimParams.maxThrustND * 100;
-            baseTime = baseT(baseMask);
-        else
-            baseThrottle = [];
-            baseTime = [];
-        end
-
-        for idx = 1:nPoints
-            if idx <= 4 % new sub plot every 3 indices (arm of divert star), but 1st has 4 as it default includes base case, others get base case added
-                neededSub = 1; 
-            else
-                neededSub = 1 + ceil((idx-4) /3);
-            end
-            if neededSub > currentSub
-                currentSub = neededSub;
-                subplot(nRows, nCols, currentSub);
-                hold on; grid on;
-                xlabel('Time (s)'); ylabel('Throttle (%)');
-                ylim([0 105]);
-
-                if currentSub == 1
-                    title(sprintf('Center & Arm 1 (Pts 1-%d)', min(4, nPoints)));
+                if idx == 1
+                    plot(tDim(mask), throttle, 'k-', 'LineWidth', 2, 'DisplayName', 'Original Trajectory');
                 else
-                    pStart = 5 + (currentSub-2)*3;
-                    pEnd = min(pStart+2, nPoints);
-                    title(sprintf('Arm %d (Pts %d-%d)', currentSub, pStart, pEnd));
-
-                    if ~isempty(baseTime)
-                        plot(baseTime, baseThrottle, 'k-', 'LineWidth', 1.5, 'DisplayName',' Original Trajectory');
-                    end
+                    plot(tDim(mask), throttle, 'LineWidth', 1.5, 'DisplayName', sprintf("Pt %d", idx), 'Color', colors(idx, :));
                 end
             end
-             tTraj = divertData{idx}.tTraj;
-             mass = divertData{idx}.stateTraj(:,7);
-             aT = divertData{idx}.aTSim;
-             r = divertData{idx}.stateTraj(:,1:3);
-             tDim = tTraj * refVals.T_ref;
-
-             rMagND = vecnorm(r, 2, 2);
-             altDim = (rMagND - rPlanetND) * refVals.L_ref;
-
-             mask = altDim <= problemParams.altDivert;
-
-             if any(mask)
-                 aTMag = vecnorm(aT, 2, 1)';
-                 throttle = (mass(mask) .* aTMag(mask)) ./ (nonDimParams.maxThrustND) * 100;
-
-                 if idx == 1
-                     plot(tDim(mask), throttle, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Original Trajectory');
-                 else
-                     plot(tDim(mask), throttle, 'LineWidth', 2, 'DisplayName', sprintf('Pt %d', idx), 'Color',colors(idx,:));
-                 end
-             end
-             legend('Location','best');
         end
-        sgtitle(sprintf('Throttle Profiles (Post-Divert, <%.0fm)', altDivert));
+        legend('Location','bestoutside');
         
 
         % Plot Complete Thrust Profiles
         figure('Name', 'Full Flight Thrust Accel Profiles');
-        nPoints = size(problemParams.divertPoints,1);
+        hold on; grid on;
+        xlabel('Time (s)'); ylabel('Thrust Accel (m/s^2)');
+        title('Thrust Acceleration Profiles, Full-Flight');
 
-        nSubplots = 8;
-
-        nCols = ceil(sqrt(nSubplots));
-        nRows = ceil(nSubplots/nCols);
-        currentSub = 0;
-
-        % Pre Solve base case to be used on all plots
-
-        baseData = divertData{1};
-        baseT = baseData.tTraj * refVals.T_ref;
-        baseRad = baseData.stateTraj(:,1:3);
-        baseMass = baseData.stateTraj(:,7);
-        baseAcc = baseData.aTSim;
-        baseAMag = vecnorm(baseAcc, 2, 1)';
-
-        for idx = 1:nPoints
-            if idx <= 4 % new sub plot every 3 indices (arm of divert star), but 1st has 4 as it default includes base case, others get base case added
-                neededSub = 1; 
+        for idx = 1:size(problemParams.divertPoints, 1)
+            tTraj = divertData{idx}.tTraj;
+            aT = divertData{idx}.aTSim;
+            tDim = tTraj * refVals.T_ref;
+            aTMag = vecnorm(aT, 2, 1)';
+            if idx == 1
+                plot(tDim, aTMag * refVals.A_ref, 'k-', 'LineWidth', 2, 'DisplayName', 'Original Trajectory');
             else
-                neededSub = 1 + ceil((idx-4) /3);
+                plot(tDim, aTMag * refVals.A_ref, 'LineWidth', 1.5, 'DisplayName', sprintf("Pt %d", idx), 'Color', colors(idx,:));
             end
-            if neededSub > currentSub
-                currentSub = neededSub;
-                subplot(nRows, nCols, currentSub);
-                hold on; grid on;
-                xlabel('Time (s)'); ylabel('Thrust Accel (m/s^2)');
-
-                if currentSub == 1
-                    title(sprintf('Center & Arm 1 (Pts 1-%d)', min(4, nPoints)));
-                else
-                    pStart = 5 + (currentSub-2)*3;
-                    pEnd = min(pStart+2, nPoints);
-                    title(sprintf('Arm %d (Pts %d-%d)', currentSub, pStart, pEnd));
-
-                    if ~isempty(baseT)
-                        plot(baseT, baseAMag * refVals.A_ref, 'k-', 'LineWidth', 1.5, 'DisplayName',' Original Trajectory');
-                    end
-                end
-            end
-             tTraj = divertData{idx}.tTraj;
-             mass = divertData{idx}.stateTraj(:,7);
-             aT = divertData{idx}.aTSim;
-             r = divertData{idx}.stateTraj(:,1:3);
-             tDim = tTraj * refVals.T_ref;
-
-             rMagND = vecnorm(r, 2, 2);
-
-             aTMag = vecnorm(aT, 2, 1)';
-
-             if idx == 1
-                 plot(tDim, aTMag * refVals.A_ref, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Original Trajectory');
-             else
-                 plot(tDim, aTMag * refVals.A_ref, 'LineWidth', 2, 'DisplayName', sprintf('Pt %d', idx), 'Color',colors(idx,:));
-             end
-             legend('Location','best');
         end
-        sgtitle('Thrust Profiles, Full-Flight');
+        legend('Location','bestoutside');
 
-        % Plot Gamma1 vs Gamma2
+        % Plot Gamma1 vs Gamma 2 History
         figure('Name','Gamma 1 vs Gamma 2 History');
-        baseHist = divertData{1}.optHistory;
-        if ~isempty(baseHist)
-            baseG1 = baseHist(:,2);
-            baseG2 = baseHist(:,3);
-        else
-            baseG1 = []; baseG2 = [];
-        end
-
-        currentSub = 0;
-
-        for idx = 1:nPoints
-            if idx <= 4
-                neededSub = 1;
-            else
-                neededSub = 1 +ceil((idx-4) /3);
-            end
-
-            if neededSub > currentSub
-                currentSub = neededSub;
-                subplot(nRows, nCols, currentSub);
-                hold on; grid on;
-                xlabel('Gamma 1'); ylabel('Gamma 2');
-
-                if currentSub==1
-                    title(sprintf('Center & Arms 1 (Pts 1-%d)', min(4, nPoints)));
-                else
-                    pStart = 5 + (currentSub-2)*3;
-                    pEnd = min(pStart+2, nPoints);
-                    title(sprintf('Arm %d (Pts %d-%d)', currentSub, pStart, pEnd));
-
-                    if ~isempty(baseG1)
-                       hBase = plot(baseG1, baseG2, 'k--', 'LineWidth', 2.5, 'DisplayName', 'Original Trajectory');
-                    end
-                end
-            end
-
+        hold on; grid on;
+        xlabel('Gamma 1'); ylabel('Gamma 2');
+        title('Parameter Evolution During Divert (Gamma 1 vs Gamma 2)');
+    
+        for idx = 1:size(problemParams.divertPoints, 1)
             currHist = divertData{idx}.optHistory;
+            
             if ~isempty(currHist)
                 g1 = currHist(:,2);
                 g2 = currHist(:,3);
-
+    
+                % Store 'idx' in UserData so the tooltip can access it later
                 if idx == 1
-                    hBase = plot(g1, g2, 'k--', 'LineWidth',1.5, 'DisplayName', 'Original Trajectory');
+                    plot(g1, g2, 'k-o', 'LineWidth', 1.5, 'MarkerSize', 4, ...
+                         'MarkerFaceColor', 'k', 'DisplayName', 'Original Trajectory', ...
+                         'UserData', idx);
                 else
-                    plot(g1, g2, 'LineWidth', 2, 'Color',colors(idx,:), 'DisplayName', sprintf('Pt %d', idx));
+                    plot(g1, g2, '-o', 'LineWidth', 1.5, 'MarkerSize', 4, ...
+                         'Color', colors(idx,:), 'MarkerFaceColor', colors(idx,:), ...
+                         'DisplayName', sprintf('Pt %d', idx), ...
+                         'UserData', idx);
                 end
             end
-            isLastinSub = (idx == 4)|| (idx > 4 && mod(idx-4, 3) == 0) || (idx == nPoints);
-            if isLastinSub
-                uistack(hBase, 'top');
-            end
-            legend('Location','best');
         end
-        sgtitle('Parameter Evolution During Divert (Gamma 1 vs Gamma 2');
+        legend('Location','bestoutside');
+    
+        % Enable Data Cursor Mode with Custom Tooltip
+        dcm = datacursormode(gcf);
+        dcm.Enable = 'on';
+        dcm.UpdateFcn = @(obj, event_obj) { ...
+            ['Gamma 1: ', num2str(event_obj.Position(1), '%.4f')], ...
+            ['Gamma 2: ', num2str(event_obj.Position(2), '%.4f')], ...
+            ['Pt: ', num2str(get(event_obj.Target, 'UserData'))] ...
+        };
 end
