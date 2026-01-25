@@ -14,7 +14,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     T_ref = sqrt(L_ref/gPlanet);
     A_ref = gPlanet;
     V_ref = L_ref / T_ref;
-    M_ref = 15103.0;
+    M_ref = vehicleParams.massInit;
 
     % Extract State & Vehicle Parameters
     altitude_km        = PDIState.altitude / 1000;

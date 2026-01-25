@@ -32,7 +32,7 @@ vehicleParams.minThrust = 4500;    % N
 % Target Landing State
 targetState = struct;
 targetState.landingLonDeg = 41.85; % deg
-targetState.landingLatDeg = -90.0; % deg
+targetState.landingLatDeg = -90.00; % deg
 targetState.rfLanding     = [0; 0; 0]; % m (TOPO)
 targetState.vfLanding     = [0; 0; -1]; % m/s
 targetState.afLanding     = [0; 0; 2*planetaryParams.gPlanet]; % m/s^2
@@ -40,12 +40,12 @@ targetState.delta_t       = 5; % s (BTT parameter, not yet implemented)
 
 %% 2. Optimization Configuration
 optimizationParams = struct;
-optimizationParams.paramsX0 = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, tgo
+optimizationParams.paramsX0 = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, tgo (dimensional)
 % Node Count for Optimization
 optimizationParams.nodeCount = 301; % Must be odd for Simpson's rule
 
 % Glideslope Constraints
-optimizationParams.glideSlopeEnabled    = false;
+optimizationParams.glideSlopeEnabled    = true;
 optimizationParams.glideSlopeFinalTheta = 45;  % deg
 optimizationParams.glideSlopeHigh       = 500; % m
 optimizationParams.glideSlopeLow        = 250; % m
@@ -57,7 +57,7 @@ optimizationParams.maxTiltAccel    = 2;  % deg/s^2
 optimizationParams.minPointing     = 10; % deg
 
 % Re-Optimization Settings
-optimizationParams.updateOpt  = true; 
+optimizationParams.updateOpt  = false; 
 optimizationParams.updateFreq = 10;   % s
 optimizationParams.updateStop = 120;   % s (Time before landing to stop updates)
 
@@ -66,7 +66,7 @@ optimizationParams.gamma1eps = 1e-2;
 optimizationParams.gamma2eps = 1e-2;
 
 % Divert
-targetState.divertEnabled = true; % Requires reopt on, will disable pointing and glideslope if not already done, and will enable Re-Opt
+targetState.divertEnabled = false; % Requires reopt on, will disable pointing and glideslope if not already done, and will enable Re-Opt
 divertDistances = [1000, 2000, 3000];
 
 divert1E = zeros(length(divertDistances),1);

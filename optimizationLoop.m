@@ -33,7 +33,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     bineq = [-optimizationParams.gamma1eps; -optimizationParams.gamma2eps; -0.01];
 
     lb = [optimizationParams.gamma1eps, 0, 0.01];
-    ub = [5, 10, 11];
+    ub = [5, 10, 15];
 
     fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
     'FiniteDifferenceType','forward','MaxIterations', 1000, ...
@@ -154,29 +154,25 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     gamma2     = params(2);
     tgo0   = params(3);
 
-    [c1, c2] = calculateCoeffs(r0, v0, tgo0, gamma1, gamma2, afStar, rfStar, vfStar, gConst);
-    tgospan = linspace(0,tgo0,nodeCount);
+    [c1, c2] = calculateCoeffs(r0, v0, tgo0, gamma1, gamma2, afStar, rfStar, vfStar, gConst); % Calculate guidance coeffs
+    tgospan = linspace(0,tgo0,nodeCount); % reverse of tspan in tgo time
 
     aT = afStar + c1*tgospan.^gamma1 + c2*tgospan.^gamma2;
     aTmag = vecnorm(aT,2,1);
 
-    Q = cumtrapz(tgospan,aTmag./isp);
+    Q = cumtrapz(tgospan,aTmag./isp); % cumulative integral of fuel expenditure correlary
     Q = Q(end) - Q;
 
-    m = m0 .* exp(-Q);
+    m = m0 .* exp(-Q); % Convert Q actually into mass units
 
     thrust = m .*(aTmag);
-    if pointingFlag
-        margin_top = 0.95;
-    else
-        margin_top = 1.00;
-    end
-    nThrustCon = 2 * nodeCount;
+
+    nThrustCon = 2 * nodeCount; % 2x nodes to include upper and lower thrust bounds
     nGlideCon = 0;
     nPointCon = 0;
     
-    if glideSlopeFlag
-        nGlideCon = floor(nodeCount * 0.15);
+    if glideSlopeFlag % num constraint needs to be consistent, preallocate number of constraints for glideslope and pointing
+        nGlideCon = floor(nodeCount * 0.15); % bottom 15% of trajectory is analyzed
     end
     if pointingFlag
         nPointCon = nodeCount;
@@ -186,16 +182,17 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     ceq = [];
 
     idx = 1;
-    upper = thrust - (margin_top*maxThrust);
+    upper = thrust - (maxThrust);
     lower = minThrust - thrust;
     c(idx:idx+nodeCount-1) = upper(:);
     idx = idx + nodeCount;
     c(idx:idx+nodeCount-1) = lower(:);
     idx = idx + nodeCount;
+
+    % Glideslope Constraint
     if glideSlopeFlag
-        glideNodes = floor(nodeCount*0.15);
         freeGlideNodes = floor(nodeCount*0.01) + 1;
-        tgospanGlide = tgospan(1:glideNodes);
+        tgospanGlide = tgospan(1:nGlideCon);
         phi1hat = (tgospanGlide.^(gamma1+2))./((gamma1+1)*(gamma1+2));
         phi2hat = (tgospanGlide.^(gamma2+2))./((gamma2+1)*(gamma2+2));
         rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospanGlide + 0.5*(gConst+afStar).*tgospanGlide.^2;
@@ -218,9 +215,9 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
         theta = (frac*45) + 45;
         theta(1:freeGlideNodes) = 90;
         
-        cGlide = cosd(theta) - dot(rUnitVec, repmat(vertUnitVec, 1, glideNodes));
-        c(idx:idx+glideNodes-1) = cGlide;
-        idx = idx + glideNodes;
+        cGlide = cosd(theta) - dot(rUnitVec, repmat(vertUnitVec, 1, nGlideCon));
+        c(idx:idx+nGlideCon-1) = cGlide;
+        idx = idx + nGlideCon;
     end
 
     if pointingFlag 
