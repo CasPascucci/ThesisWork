@@ -1,8 +1,7 @@
-clear all; clc; close all;
-% All values are dimensional values
-% Currently does stats off of Optimization values
+clear all; clc; %close all;
+addpath([pwd, '/CoordinateFunctions']);
 PDINom = struct;
-PDINom.altitude        = 15240;
+PDINom.altitude           = 15240;
 PDINom.lonInitDeg         = 41.85;
 PDINom.latInitDeg         = -71.59;
 PDINom.inertialVelocity   = 1693.8;
@@ -27,24 +26,33 @@ targetState.landingLatDeg      = -90.0;
 targetState.rfLanding = [0;0;0];
 targetState.vfLanding = [0;0;-1];
 targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
+targetState.divertEnabled = false; % No divert in dispersion test
+targetState.altDivert = 0;
+targetState.divertPoints = 0;
 
-targetState.delta_t   = 5; % seconds dim, for btt
+targetState.delta_t   = 5; % seconds dim, for btt, not implemented
 
 optimizationParams = struct;
-optimizationParams.nodeCount = 201; %Count must be odd for Simpson
+optimizationParams.paramsX0 = [0.3, 0.4, 700];
+optimizationParams.nodeCount = 301; %Count must be odd for Simpson
+optimizationParams.gamma1eps = 1e-2;
+optimizationParams.gamma2eps = 1e-2;
+
 optimizationParams.glideSlopeFinalTheta = 45; %deg
 optimizationParams.glideSlopeHigh = 500; %m
 optimizationParams.glideSlopeLow = 250; %m
 optimizationParams.glideSlopeCutoff = 50; %m
 optimizationParams.glideSlopeEnabled = true;
+
 optimizationParams.pointingEnabled = true;
 optimizationParams.maxTiltAccel = 2; % deg/s^2
 optimizationParams.minPointing = 10; %deg, floor for pointing constraint
+
 optimizationParams.updateFreq = 10;
-optimizationParams.updateStop = 140;
+optimizationParams.updateStop = 120;
 optimizationParams.updateOpt = false;
 
-beta = 0.5;
+betaParam = 0.6;
 runSimulation = true; % needs to be true
 doPlotting = false; % disable this to not plot results
 verboseOutput = false;
@@ -109,7 +117,7 @@ parfor (idx = 1:caseCount)
         vehicle.dryMass = vehicle.massInit - 8248; % this way makes the dry mass variable but fuel amount constant
 
 
-        [gammaOpt, gamma2Opt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim, ~, ~, ~] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, beta, false, false, true);
+        [gammaOpt, gamma2Opt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim, ~, ~, ~] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, betaParam, doPlotting, verboseOutput, true, runSimulation);
         
         Results(idx).k = idx;
         Results(idx).gamma = gammaOpt;
@@ -137,8 +145,9 @@ elapsed = toc(dispTime)
 done();
 
 %% Save Results
-if ~exist('Dispersion201','dir')
-    mkdir('Dispersion201');
+dispDir = 'Dispersion301';
+if ~exist(dispDir,'dir')
+    mkdir(dispDir);
 end
 
 % Timestamp for the run
@@ -156,11 +165,12 @@ if isempty(condTags)
     condTags = {'NONE'};
 end
 condTag = strjoin(condTags,'_');
-betaVal = beta * 100;
+betaVal = betaParam * 100;
 suffix  = sprintf('%dbeta_%s_%s', round(betaVal), condTag, timeRun);
 
+runTitle = sprintf('Dispersion Study (Beta: %.2f | Constraints: %s)', betaParam, strjoin(condTags, ', '));
 runName = suffix;
-runDir  = fullfile('Dispersion201', runName);
+runDir  = fullfile(dispDir, runName);
 mkdir(runDir);
 
 % Filenames
@@ -179,7 +189,7 @@ T = table( (1:numel(Results)).', [Results.exit_ok].',[Results.gamma].', [Results
 writetable(T, csvfile);
 
 %% Generate Stats Plots and Tables
-statsPlotting(Results); % Only plots results with flag 1 or 2
+statsPlotting(Results, betaParam, optimizationParams); % Only plots results with flag 1 or 2
 
 
 % Stats Summary Table

@@ -202,8 +202,12 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     end
 optError = MCMF2ENU(rdOptim(:,1), landingLatDeg,landingLonDeg,true,false);
 optErrorNorm = norm(rfLanding*refVals.L_ref - optError*refVals.L_ref);
-simError = MCMF2ENU(stateTraj(end,1:3)', landingLatDeg,landingLonDeg,true,false);
-simErrorNorm = norm(rfLanding*refVals.L_ref - simError*refVals.L_ref);
 optTable = [optErrorNorm; optFuelCost];
-simTable = [simErrorNorm; simFuelCost];
+if runSimulation
+    simError = MCMF2ENU(stateTraj(end,1:3)', landingLatDeg,landingLonDeg,true,false);
+    simErrorNorm = norm(rfLanding*refVals.L_ref - simError*refVals.L_ref);
+    simTable = [simErrorNorm; simFuelCost];
+else
+    simTable = [inf;inf];
+end
 end
