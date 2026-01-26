@@ -41,7 +41,7 @@ optimizationParams.gamma2eps = 1e-2;
 optimizationParams.glideSlopeFinalTheta = 45; %deg
 optimizationParams.glideSlopeHigh = 500; %m
 optimizationParams.glideSlopeLow = 250; %m
-optimizationParams.glideSlopeCutoff = 50; %m
+optimizationParams.freeGlideNodes = 1; %m
 optimizationParams.glideSlopeEnabled = true;
 
 optimizationParams.pointingEnabled = true;

@@ -49,7 +49,7 @@ optimizationParams.glideSlopeEnabled    = true;
 optimizationParams.glideSlopeFinalTheta = 45;  % deg
 optimizationParams.glideSlopeHigh       = 500; % m
 optimizationParams.glideSlopeLow        = 250; % m
-optimizationParams.glideSlopeCutoff     = 50;  % m
+optimizationParams.freeGlideNodes     = 1;  % Number of optimization nodes starting at landing site, counting backwards, to leave unconstrained for glideslope. Default is 1, as landing node requires infinite precision
 
 % Pointing Constraints
 optimizationParams.pointingEnabled = false;
