@@ -32,8 +32,8 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
               0  0 -1];     % tgo >= 0.01
     bineq = [-optimizationParams.gamma1eps; -optimizationParams.gamma2eps; -0.01];
 
-    lb = [0.06, 0.13, 8.2783];
-    ub = [0.06, 0.13, 8.2783];
+    lb = [optimizationParams.gamma1eps, 0, 0.01];
+    ub = [5, 10, 15];
 
     fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
     'FiniteDifferenceType','forward','MaxIterations', 1000, ...

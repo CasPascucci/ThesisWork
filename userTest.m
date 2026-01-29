@@ -101,7 +101,7 @@ targetState.divertPoints = [0, 0, 0;
 targetState.altDivert = 1000; % m
 
 %% 3. Execution Flags & Run
-beta          = 1;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta          = 0.93;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 runSimulation = true;
 doPlotting    = true; 
 verboseOutput = true;
