@@ -45,7 +45,7 @@ optimizationParams.paramsX0 = [0.3, 0.4, 700]; % Initial guess in optimization f
 optimizationParams.nodeCount = 301; % Must be odd for Simpson's rule
 
 % Glideslope Constraints
-optimizationParams.glideSlopeEnabled    = true;
+optimizationParams.glideSlopeEnabled    = false;
 optimizationParams.glideSlopeFinalTheta = 45;  % deg
 optimizationParams.glideSlopeHigh       = 500; % m
 optimizationParams.glideSlopeLow        = 250; % m
@@ -101,7 +101,7 @@ targetState.divertPoints = [0, 0, 0;
 targetState.altDivert = 1000; % m
 
 %% 3. Execution Flags & Run
-beta          = 0.6;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta          = 1;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 runSimulation = true;
 doPlotting    = true; 
 verboseOutput = true;
