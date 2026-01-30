@@ -1,51 +1,51 @@
 clear all; clc; close all;
 addpath([pwd, '/CoordinateFunctions']);
 
-fixedTgo = 594.69;
+% Key Parameters
+fixedTgo = 700;
 gammaRange = [0.01, 1.5];
 gridResolution = 100;
 
-PDIState = struct('altitude', 15240, ...
-                  'lonInitDeg', 41.85, ...
-                  'latInitDeg', -71.59, ...
-                  'inertialVelocity', 1693.8, ...
-                  'flightPathAngleDeg', 0, ...
-                  'azimuth', 180);
-planetaryParams = struct('rPlanet', 1736.01428 * 1000, ...
-                         'gPlanet', 1.622, ...
-                         'gEarth', 9.81);
-vehicleParams = struct('massInit', 15103.0, ...
-                       'dryMass', 6855, ...
-                       'isp', 311, ...
-                       'maxThrust', 45000, ...
-                       'minThrust', 4500);
-targetState = struct('landingLonDeg', 41.85, ...
-                     'landingLatDeg', -90.00, ...
-                     'rfLanding', [0;0;0], ...
-                     'vfLanding', [0;0;-1], ...
-                     'afLanding', [0;0;3.244], ...
-                     'delta_t', 5, ...
-                     'divertEnabled', false, ...
-                     'altDivert', 1000, ...
-                     'divertPoints', [0,0,0]);
+glideSlopeEnabled = false; % keep all of these flags false here, constraints aren't used in these tests
+pointingEnabled = false;
+divertEnabled = false;
 
-optParams = struct;
-optParams.nodeCount = 301; 
+nodeCount = 301;
+% Setup
+PDIState = struct('altitude', 15240, ... % meters
+                  'lonInitDeg', 41.85, ... % deg
+                  'latInitDeg', -71.59, ... % deg
+                  'inertialVelocity', 1693.8, ... % m/s
+                  'flightPathAngleDeg', 0, ... % deg, angle below horizontal for initial trajectory
+                  'azimuth', 180); % deg, heading angle, clockwise from North
 
-optParams.glideSlopeEnabled = false;
-optParams.glideSlopeFinalTheta = 45;
-optParams.glideSlopeHigh = 500;
-optParams.glideSlopeLow = 250;
-optParams.freeGlideNodes = 1;
+planetaryParams = struct('rPlanet', 1736.01428 * 1000, ... % m
+                         'gPlanet', 1.622, ... % m/s^2
+                         'gEarth', 9.81); % m/s^2
 
-optParams.pointingEnabled = false;
-optParams.maxTiltAccel = 2;
-optParams.minPointing = 10;
+vehicleParams = struct('massInit', 15103.0, ... % kg
+                       'dryMass', 6855, ... % kg
+                       'isp', 311, ... % seconds
+                       'maxThrust', 45000, ... % Newtons
+                       'minThrust', 4500); % N
+
+targetState = struct('landingLonDeg', 41.85, ... % deg
+                     'landingLatDeg', -90.00, ... % deg
+                     'rfLanding', [0;0;0], ...  % meters, centered at lunar radius at above landing coordinates
+                     'vfLanding', [0;0;-1], ...  % m/s
+                     'afLanding', [0;0;2*planetaryParams.gPlanet], ... % m/s^2
+                     'delta_t', 5, ... % seconds, not currently implemented
+                     'divertEnabled', divertEnabled, ... % keep false here
+                     'altDivert', 1000, ... % not used here
+                     'divertPoints', [0,0,0]); % not used here
 
 L_ref = 10000;
 T_ref = sqrt(L_ref/planetaryParams.gPlanet);
-refVals = struct('L_ref', L_ref, 'T_ref', T_ref, 'A_ref', planetaryParams.gPlanet, ...
-    'V_ref', L_ref/T_ref, 'M_ref', vehicleParams.massInit);
+refVals = struct('L_ref', L_ref, ...
+                 'T_ref', T_ref, ...
+                 'A_ref', planetaryParams.gPlanet, ...
+                 'V_ref', L_ref/T_ref, ...
+                 'M_ref', vehicleParams.massInit);
 
 [r0Dim, v0Dim] = PDI2MCMF(PDIState.altitude/1000, PDIState.lonInitDeg, PDIState.latInitDeg, ...
     targetState.landingLonDeg, targetState.landingLatDeg, PDIState.inertialVelocity, ...
@@ -55,20 +55,21 @@ rfDim = refVals.L_ref * ENU2MCMF(targetState.rfLanding/10000, targetState.landin
 vfDim = ENU2MCMF(targetState.vfLanding, targetState.landingLatDeg, targetState.landingLonDeg, false);
 afDim = ENU2MCMF(targetState.afLanding, targetState.landingLatDeg, targetState.landingLonDeg, false);
 
+rfStarND = rfDim/L_ref;
+vfStarND = vfDim/refVals.V_ref;
+afStarND = afDim/refVals.A_ref;
+nonDim = struct('r0ND',r0Dim/L_ref, ...
+                'v0ND',v0Dim/refVals.V_ref, ...
+                'rfStarND',rfStarND, ...
+                'vfStarND',vfStarND, ...
+                'afStarND',afStarND, ...
+                'gConst',-(planetaryParams.rPlanet/L_ref)^2 * rfStarND / (norm(rfStarND)^3), ...
+                'm0ND', 1.0,...
+                'ispND', vehicleParams.isp * 9.81 / refVals.V_ref,...
+                'maxThrustND',vehicleParams.maxThrust / (vehicleParams.massInit * refVals.A_ref), ...
+                'minThrustND',vehicleParams.minThrust / (vehicleParams.massInit * refVals.A_ref));
 
-nonDim = struct();
-nonDim.r0ND = r0Dim/L_ref;
-nonDim.v0ND = v0Dim/refVals.V_ref;
-nonDim.rfStarND = rfDim/L_ref;
-nonDim.vfStarND = vfDim/refVals.V_ref;
-nonDim.afStarND = afDim/refVals.A_ref;
-nonDim.gConst = -(planetaryParams.rPlanet/L_ref)^2 * nonDim.rfStarND / (norm(nonDim.rfStarND)^3);
-nonDim.m0ND = 1.0;
-nonDim.ispND = vehicleParams.isp * 9.81 / refVals.V_ref;
-nonDim.maxThrustND = vehicleParams.maxThrust / (vehicleParams.massInit * refVals.A_ref);
-nonDim.minThrustND = vehicleParams.minThrust / (vehicleParams.massInit * refVals.A_ref);
-
-fprintf('Gamma Sweep, Fixed Params: Tgo=%.0fs\n', fixedTgo);
+fprintf('Gamma Sweep, Fixed Tgo=%.0fs\n', fixedTgo);
 
 
 g1Vec = linspace(gammaRange(1), gammaRange(2), gridResolution);
@@ -84,7 +85,12 @@ for idx = 1:numel(G1)
         activeGammaSweep(idx) = NaN;
         continue;
     end
-    [fuelCost, nActive] = evaluateTraj(G1(idx),G2(idx), fixedTgo, nonDim, refVals, optParams);
+    if G2(idx) < G1(idx)
+        fuelGammaSweep(idx) = NaN;
+        activeGammaSweep(idx) = NaN;
+        continue;
+    end
+    [fuelCost, nActive] = evaluateTraj(G1(idx),G2(idx), fixedTgo, nonDim, refVals, nodeCount);
     fuelGammaSweep(idx) = fuelCost;
     activeGammaSweep(idx) = nActive;
 end
@@ -149,14 +155,14 @@ writetable(T_Gamma, fullfile(folderName, 'Gamma_Sweep_Data.csv'));
 
 fprintf('Results saved to: %s\n', folderName);
 %% Functions
-function [fuelKg, activeCount] = evaluateTraj(gamma1, gamma2, tgoSec, nonDim, refVals, optParams)
+function [fuelKg, activeCount] = evaluateTraj(gamma1, gamma2, tgoSec, nonDim, refVals, nodeCount)
     tgoND = tgoSec / refVals.T_ref;
     try
         [c1, c2] = calculateCoeffs(nonDim.r0ND, nonDim.v0ND, tgoND, gamma1, gamma2, nonDim.afStarND, nonDim.rfStarND, nonDim.vfStarND, nonDim.gConst);
     catch
         fuelKg = NaN; activeCount = NaN; return;
     end
-    tgospan = linspace(0, tgoND, optParams.nodeCount);
+    tgospan = linspace(0, tgoND, nodeCount);
     aT = nonDim.afStarND + c1.*(tgospan.^gamma1) + c2.*(tgospan.^gamma2);
     aTmag = vecnorm(aT, 2, 1);
     

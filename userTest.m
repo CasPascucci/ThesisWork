@@ -2,62 +2,61 @@ clear all;  clc; format short
 %close all;
 addpath([pwd, '/CoordinateFunctions']);
 
+%% Key Parameters
+beta = 0.6;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+
+glideSlopeEnabled = true;
+pointingEnabled = true;
+reOptimizationEnabled = true;
+divertEnabled = false; % Will internally force reOpt On, glideSlope and pointing Off
+
 %% 1. Initial State Definitions
 % PDI (Powered Descent Initiation) State - Dimensional
-PDIState = struct;
-PDIState.altitude           = 15240;   % This Altitude value matches the altitude value in prior Dr. Lu works
-%PDIState.altitude           = 13360;   % This Altitude value matches the planetary radius in prior Dr. Lu works, better for comparison
-% ABOVE ALTITUDE DOES NOT MATCH RADII AT LANDING AND SO APPEARS
-% ARTIFICIALLY EFFICIENT COMPARED TO G-POLAR BANG BANG
-PDIState.lonInitDeg         = 41.85;   % deg
-PDIState.latInitDeg         = -71.59;  % deg
-PDIState.inertialVelocity   = 1693.8;  % m/s
-PDIState.flightPathAngleDeg = 0;       % deg
-PDIState.azimuth            = 180;     % deg
+PDIState = struct('altitude', 15240, ... % meters
+                  'lonInitDeg', 41.85, ... % deg
+                  'latInitDeg', -71.59, ... % deg
+                  'inertialVelocity', 1693.8, ... % m/s
+                  'flightPathAngleDeg', 0, ... % deg, angle below horizontal for initial trajectory
+                  'azimuth', 180); % deg, heading angle, clockwise from North
 
-% Planetary Constants (Moon)
-planetaryParams = struct;
-planetaryParams.rPlanet = 1736.01428 * 1000; % m
-planetaryParams.gPlanet = 1.622;             % m/s^2
-planetaryParams.gEarth  = 9.81;              % m/s^2
+planetaryParams = struct('rPlanet', 1736.01428 * 1000, ... % m
+                         'gPlanet', 1.622, ... % m/s^2
+                         'gEarth', 9.81); % m/s^2
 
-% Vehicle Parameters
-vehicleParams = struct;
-vehicleParams.massInit  = 15103.0; % kg
-vehicleParams.dryMass   = vehicleParams.massInit - 8248; % kg
-vehicleParams.isp       = 311;     % s
-vehicleParams.maxThrust = 45000;   % N
-vehicleParams.minThrust = 4500;    % N
+vehicleParams = struct('massInit', 15103.0, ... % kg
+                       'dryMass', 6855, ... % kg
+                       'isp', 311, ... % seconds
+                       'maxThrust', 45000, ... % Newtons
+                       'minThrust', 4500); % N
 
-% Target Landing State
-targetState = struct;
-targetState.landingLonDeg = 41.85; % deg
-targetState.landingLatDeg = -90.00; % deg
-targetState.rfLanding     = [0; 0; 0]; % m (TOPO)
-targetState.vfLanding     = [0; 0; -1]; % m/s
-targetState.afLanding     = [0; 0; 2*planetaryParams.gPlanet]; % m/s^2
-targetState.delta_t       = 5; % s (BTT parameter, not yet implemented)
+targetState = struct('landingLonDeg', 41.85, ... % deg
+                     'landingLatDeg', -90.00, ... % deg
+                     'rfLanding', [0;0;0], ...  % meters, centered at lunar radius at above landing coordinates
+                     'vfLanding', [0;0;-1], ...  % m/s
+                     'afLanding', [0;0;2*planetaryParams.gPlanet], ... % m/s^2
+                     'delta_t', 5, ... % seconds, not currently implemented
+                     'divertEnabled', divertEnabled); % Requires reopt on, will disable pointing and glideslope if not already done, and will enable Re-Opt
 
 %% 2. Optimization Configuration
 optimizationParams = struct;
 optimizationParams.paramsX0 = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, tgo (dimensional)
-% Node Count for Optimization
-optimizationParams.nodeCount = 301; % Must be odd for Simpson's rule
+
+optimizationParams.nodeCount = 301; % Node Count for Optimization, must be odd for Simpson's rule
 
 % Glideslope Constraints
-optimizationParams.glideSlopeEnabled    = false;
+optimizationParams.glideSlopeEnabled    = glideSlopeEnabled;
 optimizationParams.glideSlopeFinalTheta = 45;  % deg
 optimizationParams.glideSlopeHigh       = 500; % m
 optimizationParams.glideSlopeLow        = 250; % m
 optimizationParams.freeGlideNodes     = 1;  % Number of optimization nodes starting at landing site, counting backwards, to leave unconstrained for glideslope. Default is 1, as landing node requires infinite precision
 
 % Pointing Constraints
-optimizationParams.pointingEnabled = false;
+optimizationParams.pointingEnabled = pointingEnabled;
 optimizationParams.maxTiltAccel    = 2;  % deg/s^2
 optimizationParams.minPointing     = 10; % deg
 
 % Re-Optimization Settings
-optimizationParams.updateOpt  = false; 
+optimizationParams.updateOpt  = reOptimizationEnabled; 
 optimizationParams.updateFreq = 10;   % s
 optimizationParams.updateStop = 120;   % s (Time before landing to stop updates)
 
@@ -66,10 +65,9 @@ optimizationParams.gamma1eps = 1e-2;
 optimizationParams.gamma2eps = 1e-2;
 
 % Divert
-targetState.divertEnabled = false; % Requires reopt on, will disable pointing and glideslope if not already done, and will enable Re-Opt
-divertDistances = [1000, 2000, 3000];
+divertDistances = [1000, 2000, 3000]; % Distances in meters away from original site, the 8-point rings of divert will occur at each of these distances
 
-divert1E = zeros(length(divertDistances),1);
+divert1E = zeros(length(divertDistances),1); % each line here sets up the North and East Coordinates of the divert points
 divert1N = divertDistances';
 divert2E = divertDistances'.*cosd(45);
 divert2N = divert2E;
@@ -87,7 +85,8 @@ divert8E = -divertDistances'.*cosd(45);
 divert8N = -divert8E;
 
 
-
+% Group the divert coordinates into a matrix. Will be 8n+1 x 3, where n is
+% number of divert distances chosen above
 targetState.divertPoints = [0, 0, 0;
                             divert1E, divert1N, zeros(length(divertDistances),1);
                             divert2E, divert2N, zeros(length(divertDistances),1);
@@ -97,11 +96,10 @@ targetState.divertPoints = [0, 0, 0;
                             divert6E, divert6N, zeros(length(divertDistances),1);
                             divert7E, divert7N, zeros(length(divertDistances),1);
                             divert8E, divert8N, zeros(length(divertDistances),1)];
-%targetState.divertPoints = [-150, -300, 0]; % m % Single case, above block is multiple divert plots
-targetState.altDivert = 1000; % m
+%targetState.divertPoints = [-150, -300, 0]; % meters % Single case, above block is multiple divert plots
+targetState.altDivert = 1000; % m, altitude above ground to trigger divert scenario
 
 %% 3. Execution Flags & Run
-beta          = 0.93;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 runSimulation = true;
 doPlotting    = true; 
 verboseOutput = true;
