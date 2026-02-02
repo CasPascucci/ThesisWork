@@ -144,6 +144,10 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
             % Static Simulation
             [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = ...
                 closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
+            [c1_static, c2_static, c1_num, c2_num] = calculateCoeffs(nonDimParams.r0ND, nonDimParams.v0ND, optParams(3), ...
+                                       gammaOpt, gamma2Opt, nonDimParams.afStarND, ...
+                                       nonDimParams.rfStarND, nonDimParams.vfStarND, nonDimParams.gConst);
+            optHistory = [c1_static, c2_static, c1_num, c2_num];
         else
             divertTrajectories = cell(1,size(problemParams.divertPoints, 1));
             if divertEnabled % Re-Optimization with Divert

@@ -3,11 +3,11 @@ clear all;  clc; format short
 addpath([pwd, '/CoordinateFunctions']);
 
 %% Key Parameters
-beta = 0.6;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta = 0.85;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 
 glideSlopeEnabled = true;
-pointingEnabled = true;
-reOptimizationEnabled = true;
+pointingEnabled = false;
+reOptimizationEnabled = false;
 divertEnabled = false; % Will internally force reOpt On, glideSlope and pointing Off
 
 %% 1. Initial State Definitions
@@ -62,7 +62,7 @@ optimizationParams.updateStop = 120;   % s (Time before landing to stop updates)
 
 % Tolerances
 optimizationParams.gamma1eps = 1e-2;
-optimizationParams.gamma2eps = 1e-2;
+optimizationParams.gamma2eps = 1e-4;
 
 % Divert
 divertDistances = [1000, 2000, 3000]; % Distances in meters away from original site, the 8-point rings of divert will occur at each of these distances

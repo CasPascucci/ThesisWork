@@ -1,4 +1,4 @@
-function [c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, afStar, rfStar, vfStar, g)
+function [c1, c2, c1_num, c2_num] = calculateCoeffs(r, v, tgo, gamma1, gamma2, afStar, rfStar, vfStar, g)
     phi1_bar = -1/(gamma1 + 1) * tgo^(gamma1 + 1);
     phi2_bar = -1/(gamma2 + 1) * tgo^(gamma2 + 1);
 
@@ -12,4 +12,9 @@ function [c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, afStar, rfStar, v
 
     c1 = ( -phi2_hat * v_err +  phi2_bar * r_err) / delta;
     c2 = (  phi1_hat * v_err -  phi1_bar * r_err) / delta;
+    
+    if nargout > 2
+        c1_num = ( -phi2_hat * v_err +  phi2_bar * r_err);
+        c2_num = (  phi1_hat * v_err -  phi1_bar * r_err);
+    end
 end
