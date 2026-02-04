@@ -4,8 +4,9 @@ addpath([pwd, '/CoordinateFunctions']);
 
 % Key Parameters 
 fixedGamma1 = 0.01;
-fixedGamma2 = 0.7570;
-tgoRange = [567,800];
+fixedGamma2 = 0.8872;
+tgoRange = [570,800];
+betaVal = 1;
 % IF console prints message stating that too many constraints are active,
 % adjust tgoRange to a safer region, constraints at beginning of
 % activeTgoSweep mean the range should be moved to higher values, and vice
@@ -77,12 +78,12 @@ fprintf('Tgo Sweep, Fixed Params: G1=%.2f, G2=%.2f\n', fixedGamma1, fixedGamma2)
 numPoints = 100;
 
 tgoVec = linspace(tgoRange(1),tgoRange(2),numPoints);
-fuelTgoSweep = zeros(numPoints,1);
+costTgoSweep = zeros(numPoints,1);
 activeTgoSweep = zeros(numPoints,1);
 
 for idx = 1: numPoints
-    [fuelCost, nActive] = evaluateTraj(fixedGamma1,fixedGamma2, tgoVec(idx), nonDim, refVals, nodeCount);
-    fuelTgoSweep(idx) = fuelCost;
+    [cost, nActive] = evaluateTraj(fixedGamma1,fixedGamma2, tgoVec(idx), betaVal, nonDim, refVals, nodeCount);
+    costTgoSweep(idx) = cost;
     activeTgoSweep(idx) = nActive;
 end
 
@@ -93,17 +94,17 @@ if maxConstraints >= 2
 end
 
 % Find max and minimum fuel, and slope approximation between them
-[maxFuel, maxFuelIdx] = max(fuelTgoSweep);
-[minFuel, minFuelIdx] = min(fuelTgoSweep);
-maxFuelTime = tgoVec(maxFuelIdx);
-minFuelTime = tgoVec(minFuelIdx);
-fprintf("Max fuel cost of %.1f @ tgo = %.1f\n", maxFuel, maxFuelTime);
-fprintf("Min fuel cost of %.1f @ tgo = %.1f\n", minFuel, minFuelTime);
+[maxCost, maxCostIdx] = max(costTgoSweep);
+[minCost, minCostIdx] = min(costTgoSweep);
+maxCostTime = tgoVec(maxCostIdx);
+minCostTime = tgoVec(minCostIdx);
+fprintf("Max cost of %.1f @ tgo = %.1f\n", maxCost, maxCostTime);
+fprintf("Min cost of %.1f @ tgo = %.1f\n", minCost, minCostTime);
 
 % Approximate as a quadratic
-coeffs = polyfit(tgoVec, fuelTgoSweep, 2);
+coeffs = polyfit(tgoVec, costTgoSweep, 2);
 fprintf("Approx quadratic: %.4fx^2 + %.4fx + %.2f\n", coeffs);
-fprintf("Approx slope: %.2f", (maxFuel-minFuel)/(maxFuelTime-minFuelTime));
+fprintf("Approx slope: %.4f\n", (maxCost-minCost)/(maxCostTime-minCostTime));
 
 %% Saving
 folderName = sprintf('Tgo Sweep/G1_%.2f_G2_%.2f', fixedGamma1, fixedGamma2);
@@ -112,7 +113,7 @@ if ~exist(folderName,"dir")
 end
 
 f1 = figure('Name','Fuel Consumption Sensitivty to Tgo Sweep'); hold on;
-plot(tgoVec, fuelTgoSweep, 'b-', 'LineWidth',2);
+plot(tgoVec, costTgoSweep, 'b-', 'LineWidth',2);
 xlabel('Time of Flight of Trajectory'); ylabel('Fuel Consumption from Optimized Trajectory');
 title('Fuel Consumption Sensitivty to $t_{go}$ Sweep','Interpreter','latex');
 subtitle(sprintf("$\\gamma_1$ = %.3f, $\\gamma_2$ = %.3f", fixedGamma1, fixedGamma2), 'Interpreter','latex');
@@ -121,22 +122,24 @@ f1axes.FontSize = 20;
 
 
 
-function [fuelKg, activeCount] = evaluateTraj(gamma1, gamma2, tgoSec, nonDim, refVals, nodeCount)
+function [cost, activeCount] = evaluateTraj(gamma1, gamma2, tgoSec, betaVal, nonDim, refVals, nodeCount)
     tgoND = tgoSec / refVals.T_ref;
     try
         [c1, c2] = calculateCoeffs(nonDim.r0ND, nonDim.v0ND, tgoND, gamma1, gamma2, nonDim.afStarND, nonDim.rfStarND, nonDim.vfStarND, nonDim.gConst);
     catch
-        fuelKg = NaN; activeCount = NaN; return;
+        cost = NaN; activeCount = NaN; return;
     end
     tgospan = linspace(0, tgoND, nodeCount);
     aT = nonDim.afStarND + c1.*(tgospan.^gamma1) + c2.*(tgospan.^gamma2);
     aTmag = vecnorm(aT, 2, 1);
     Q = cumtrapz(tgospan, aTmag ./ nonDim.ispND);
     Q = Q(end) - Q;
+    simpson1 = simpsonComp13Integral(tgospan,aTmag);
+    simpson2 = simpsonComp13Integral(tgospan,dot(aT,aT));
+    cost = betaVal*simpson1 + (1-betaVal)*simpson2;
     
     mCurrent = nonDim.m0ND * exp(-Q);
     thrustMag = mCurrent .* aTmag; 
-    fuelKg = refVals.M_ref * nonDim.m0ND * (1 - mCurrent(1)/nonDim.m0ND);
     tol = 1e-4;
     activeNodes = sum((thrustMag - nonDim.maxThrustND) > tol) + sum((nonDim.minThrustND - thrustMag) > tol);
     activeCount = activeNodes;
