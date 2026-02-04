@@ -2,8 +2,9 @@ clear all; clc; close all;
 addpath([pwd, '/CoordinateFunctions']);
 
 % Key Parameters
-fixedTgo = 700;
-gammaRange = [0.01, 1.5];
+fixedTgo = 601;
+gammaRange = [0.01, 1.4];
+betaVal = 0.92;
 gridResolution = 100;
 
 glideSlopeEnabled = false; % keep all of these flags false here, constraints aren't used in these tests
@@ -76,22 +77,22 @@ g1Vec = linspace(gammaRange(1), gammaRange(2), gridResolution);
 g2Vec = linspace(gammaRange(1), gammaRange(2), gridResolution);
 [G1, G2] = meshgrid(g1Vec, g2Vec);
 
-fuelGammaSweep = zeros(gridResolution,gridResolution);
+costGammaSweep = zeros(gridResolution,gridResolution);
 activeGammaSweep = zeros(gridResolution,gridResolution);
 
 for idx = 1:numel(G1)
     if abs(G1(idx) - G2(idx)) < 1e-4
-        fuelGammaSweep(idx) = NaN;
+        costGammaSweep(idx) = NaN;
         activeGammaSweep(idx) = NaN;
         continue;
     end
     if G2(idx) < G1(idx)
-        fuelGammaSweep(idx) = NaN;
+        costGammaSweep(idx) = NaN;
         activeGammaSweep(idx) = NaN;
         continue;
     end
-    [fuelCost, nActive] = evaluateTraj(G1(idx),G2(idx), fixedTgo, nonDim, refVals, nodeCount);
-    fuelGammaSweep(idx) = fuelCost;
+    [cost, nActive] = evaluateTraj(G1(idx),G2(idx), fixedTgo, betaVal, nonDim, refVals, nodeCount);
+    costGammaSweep(idx) = cost;
     activeGammaSweep(idx) = nActive;
 end
 
@@ -100,18 +101,18 @@ if maxConstraints >= 2
     fprintf("Thrust Saturated at more than one point on at least one trajectory\n")
 end
 
-maxFuel = max(fuelGammaSweep, [], 'all', 'omitnan');
-minFuel = min(fuelGammaSweep, [], 'all', 'omitnan');
-validMask = ~isnan(fuelGammaSweep);
+maxCost = max(costGammaSweep, [], 'all', 'omitnan');
+minCost = min(costGammaSweep, [], 'all', 'omitnan');
+validMask = ~isnan(costGammaSweep);
 if any(validMask, 'all')
-    [minRow, minCol] = find(fuelGammaSweep == minFuel, 1);
-    [maxRow, maxCol] = find(fuelGammaSweep == maxFuel, 1);
+    [minRow, minCol] = find(costGammaSweep == minCost, 1);
+    [maxRow, maxCol] = find(costGammaSweep == maxCost, 1);
     bestG1min = G1(minRow, minCol);
     bestG2min = G2(minRow, minCol);
     bestG1max = G1(maxRow, maxCol);
     bestG2max = G2(maxRow, maxCol);
-    fprintf("Min fuel cost of %.1f @ G1=%.2f, G2=%.2f\n", minFuel, bestG1min, bestG2min);
-    fprintf("Max fuel cost of %.1f @ G1=%.2f, G2=%.2f\n", maxFuel, bestG1max, bestG2max);
+    fprintf("Min cost of %.1f @ G1=%.2f, G2=%.2f\n", minCost, bestG1min, bestG2min);
+    fprintf("Max cost of %.1f @ G1=%.2f, G2=%.2f\n", maxCost, bestG1max, bestG2max);
 else
     fprintf("No valid solutions found.\n");
 end
@@ -123,8 +124,9 @@ end
 
 % Figure 1: Fuel Contour
 f1 = figure('Name','Fuel Consumption Sensitivity to Gamma'); hold on;
-contourf(G1, G2, fuelGammaSweep, 50); colorbar;
+surf(G1, G2, costGammaSweep);
 axis equal;
+plot3(bestG1min,bestG2min,minCost,'.r','MarkerSize',20)
 xlabel('$\gamma_1$','Interpreter','latex'); 
 ylabel('$\gamma_2$','Interpreter','latex');
 title('Fuel Consumption Sensitivity to Gamma','Interpreter','latex');
@@ -133,6 +135,7 @@ f1axes = f1.findobj("Type", "axes");
 f1axes.FontSize = 20;
 saveas(f1, fullfile(folderName, 'Fuel_Contour.png'));
 saveas(f1, fullfile(folderName, 'Fuel_Contour.fig'));
+
 
 % Figure 2: Constraints Surface
 f2 = figure('Name','Active Constraints Map'); hold on;
@@ -149,18 +152,18 @@ saveas(f2, fullfile(folderName, 'Constraints_Map.fig'));
 
 
 
-T_Gamma = table(G1(:), G2(:), fuelGammaSweep(:), activeGammaSweep(:), ...
+T_Gamma = table(G1(:), G2(:), costGammaSweep(:), activeGammaSweep(:), ...
     'VariableNames', {'Gamma1', 'Gamma2', 'FuelCost_kg', 'ActiveConstraints'});
 writetable(T_Gamma, fullfile(folderName, 'Gamma_Sweep_Data.csv'));
 
 fprintf('Results saved to: %s\n', folderName);
 %% Functions
-function [fuelKg, activeCount] = evaluateTraj(gamma1, gamma2, tgoSec, nonDim, refVals, nodeCount)
+function [cost, activeCount] = evaluateTraj(gamma1, gamma2, tgoSec, betaVal, nonDim, refVals, nodeCount)
     tgoND = tgoSec / refVals.T_ref;
     try
         [c1, c2] = calculateCoeffs(nonDim.r0ND, nonDim.v0ND, tgoND, gamma1, gamma2, nonDim.afStarND, nonDim.rfStarND, nonDim.vfStarND, nonDim.gConst);
     catch
-        fuelKg = NaN; activeCount = NaN; return;
+        cost = NaN; activeCount = NaN; return;
     end
     tgospan = linspace(0, tgoND, nodeCount);
     aT = nonDim.afStarND + c1.*(tgospan.^gamma1) + c2.*(tgospan.^gamma2);
@@ -168,10 +171,12 @@ function [fuelKg, activeCount] = evaluateTraj(gamma1, gamma2, tgoSec, nonDim, re
     
     Q = cumtrapz(tgospan, aTmag ./ nonDim.ispND);
     Q = Q(end) - Q;
+    simpson1 = simpsonComp13Integral(tgospan,aTmag);
+    simpson2 = simpsonComp13Integral(tgospan,dot(aT,aT));
+    cost = betaVal*simpson1 + (1-betaVal)*simpson2;
     
     mCurrent = nonDim.m0ND * exp(-Q);
     thrustMag = mCurrent .* aTmag; 
-    fuelKg = refVals.M_ref * nonDim.m0ND * (1 - mCurrent(1)/nonDim.m0ND);
     
     tol = 1e-4;
     activeNodes = sum((thrustMag - nonDim.maxThrustND) > tol) + sum((nonDim.minThrustND - thrustMag) > tol);
