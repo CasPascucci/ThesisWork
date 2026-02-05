@@ -2,7 +2,7 @@ clear all; clc; close all;
 addpath([pwd, '/CoordinateFunctions']);
 
 % Key Parameters
-fixedTgo = 601;
+fixedTgo = 650;
 gammaRange = [0.01, 1.4];
 betaVal = 0.92;
 gridResolution = 100;

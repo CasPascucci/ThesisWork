@@ -3,7 +3,7 @@ clear all;  clc; format short
 addpath([pwd, '/CoordinateFunctions']);
 
 %% Key Parameters
-beta = 0.92;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta = 1.0;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 
 glideSlopeEnabled = false;
 pointingEnabled = false;
