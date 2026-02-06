@@ -1,4 +1,8 @@
-function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma,gamma2,tgo0, problemParams, nonDimParams, refVals, delta_t)
+function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma,gamma2,tgo0, problemParams, nonDimParams, refVals, delta_t, monteCarloSeed)
+
+    if nargin < 8
+        monteCarloSeed = [];
+    end
 
     kr = (gamma2+2)*(gamma+2);
 
@@ -22,7 +26,7 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
     X0 = [r0; v0; m0];
     odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
      [tTraj, stateTraj] = ode45(@(t, X) trajectory(t, X, gamma, kr, ...
-                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref, refVals, gConst, nonDimParams.minThrustND, nonDimParams.maxThrustND, delta_t, BTT), linspace(0,tgo0,500), X0, odeoptions);
+                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref, refVals, gConst, nonDimParams.minThrustND, nonDimParams.maxThrustND, delta_t, BTT, monteCarloSeed), linspace(0,tgo0,500), X0, odeoptions);
 
      rState = stateTraj(:,1:3);
      vState = stateTraj(:,4:6);
@@ -58,6 +62,9 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
                  aT3 = ((gamma+1)/tgoVirt)*(1-kr/(gamma+2))*(vfVirtual-v);
                  aT4 = (kr/tgoVirt^2)*(rfVirtual-r-v*tgoVirt);
                  aTi = aT1 + aT2 + aT3 + aT4;
+                 if ~isempty(monteCarloSeed)
+                    aTi = aTi * monteCarloSeed;
+                 end
                  if norm(aTi) > maxAccel
                      aTi = aTi / norm(aTi) * maxAccel;
                      flag_thrustGotLimited = true;
@@ -71,6 +78,9 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
                  aT3 = ((gamma+1)/tgoVirt)*(1-kr/(gamma+2))*(vfVirtual-v);
                  aT4 = (kr/tgoVirt^2)*(rfVirtual-r-v*tgoVirt);
                  aTi = aT1 + aT2 + aT3 + aT4;
+                 if ~isempty(monteCarloSeed)
+                    aTi = aTi * monteCarloSeed;
+                 end
                  if norm(aTi) > maxAccel
                      aTi = aTi / norm(aTi) * maxAccel;
                      flag_thrustGotLimited = true;
@@ -86,6 +96,9 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
                  aT3 = ((gamma+1)/tgo)*(1-kr/(gamma+2))*(vfStar-v);
                  aT4 = (kr/tgo^2)*(rfStar-r-v*tgo);
                  aTi = aT1 + aT2 + aT3 + aT4;
+                 if ~isempty(monteCarloSeed)
+                    aTi = aTi * monteCarloSeed;
+                 end
                  if norm(aTi) > maxAccel
                      aTi = aTi / norm(aTi) * maxAccel;
                      flag_thrustGotLimited = true;
@@ -105,7 +118,7 @@ end
 
 
 %% Functions
-function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, afStar, T_ref, refVals, gConst, minThrust, maxThrust, delta_t, BTT)
+function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, afStar, T_ref, refVals, gConst, minThrust, maxThrust, delta_t, BTT, monteCarloSeed)
     r    = X(1:3);
     v    = X(4:6);
     mass = X(7);
@@ -130,6 +143,9 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, 
             aT3 = ((gamma+1)/tgoVirt)*(1-kr/(gamma+2))*(vfVirtual-v);
             aT4 = (kr/tgoVirt^2)*(rfVirtual-r-v*tgoVirt);
             aT = aT1 + aT2 + aT3 + aT4;
+            if ~isempty(monteCarloSeed)
+                aT = aT * monteCarloSeed;
+            end
             if norm(aT) > maxAccel
                 aT = aT / norm(aT) * maxAccel;
             elseif norm(aT) < minAccel
@@ -143,6 +159,9 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, 
             aT3 = ((gamma+1)/tgoVirt)*(1-kr/(gamma+2))*(vfVirtual-v);
             aT4 = (kr/tgoVirt^2)*(rfVirtual-r-v*tgoVirt);  
             aT = aT1 + aT2 + aT3 + aT4;
+            if ~isempty(monteCarloSeed)
+                aT = aT * monteCarloSeed;
+            end
             if norm(aT) > maxAccel
                 aT = aT / norm(aT) * maxAccel;
             elseif norm(aT) < minAccel
@@ -156,6 +175,9 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, 
             aT3 = ((gamma+1)/tgo)*(1-kr/(gamma+2))*(vfStar-v);
             aT4 = (kr/tgo^2)*(rfStar-r-v*tgo);
             aT = aT1 + aT2 + aT3 + aT4;
+            if ~isempty(monteCarloSeed)
+                aT = aT * monteCarloSeed;
+            end
             if norm(aT) > maxAccel
                 aT = aT / norm(aT) * maxAccel;
             elseif norm(aT) < minAccel

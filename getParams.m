@@ -1,7 +1,9 @@
 function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals, optTable, simTable] = ...
-    getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation)
-
+    getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation, monteCarloSeed)
     
+    if nargin > 10
+        monteCarlo = true; % 11th arg in is only for Accel Monte Carlo Sim
+    end
 
     %% 1. Initialization & Defaults
     % Planetary Constants
@@ -138,9 +140,23 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     optHistory = [];
     ICstates = [];
     exitFlags = [];
-
-    if runSimulation
-        if ~reopt
+    if monteCarlo
+        [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = ...
+            closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, monteCarloSeed);
+        [c1_static, c2_static, c1_num, c2_num] = calculateCoeffs(nonDimParams.r0ND, nonDimParams.v0ND, optParams(3), ...
+                                   gammaOpt, gamma2Opt, nonDimParams.afStarND, ...
+                                   nonDimParams.rfStarND, nonDimParams.vfStarND, nonDimParams.gConst);
+        optHistory = [c1_static, c2_static, c1_num, c2_num];
+        if ~isempty(optHistory)
+            optHistory = array2table(optHistory);
+            optHistory.Properties.VariableNames(1:5) = {'t_elapsedND','gamma1','gamma2','kr','tgoND'};
+            ICstates = array2table(ICstates');
+            ICstates.Properties.VariableNames(1:7) = {'r0_X', 'r0_Y', 'r0_Z', 'v0_X', 'v0_Y', 'v0_Z', 'm0'};
+        end
+        simFuelCost = M_ref * (stateTraj(1,7) - stateTraj(end,7));
+        finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, true);
+    elseif runSimulation % Only enter if simulation is required
+        if ~reopt % If not reoptimizing call this variant
             % Static Simulation
             [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = ...
                 closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
@@ -148,9 +164,9 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
                                        gammaOpt, gamma2Opt, nonDimParams.afStarND, ...
                                        nonDimParams.rfStarND, nonDimParams.vfStarND, nonDimParams.gConst);
             optHistory = [c1_static, c2_static, c1_num, c2_num];
-        else
+        else % If reoptimizing, call this one
             divertTrajectories = cell(1,size(problemParams.divertPoints, 1));
-            if divertEnabled % Re-Optimization with Divert
+            if divertEnabled % Re-Optimization with Divert, as reopt is required for divert
                 for idx = 1:size(problemParams.divertPoints, 1)
                     divertPoint = problemParams.divertPoints(idx,:)' ./ refVals.L_ref;
                     divertPoint = ENU2MCMF(divertPoint, landingLatDeg, landingLonDeg, true);
@@ -159,10 +175,13 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
                     divertTrajectories{idx} = stateTraj(:,1:3);
                 end
             else
-                % Re-Optimization Simulation
+                % regular Re-Optimization Simulation
                 [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
                     simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
             end
+
+
+
             
             % Format History Output
             if ~isempty(optHistory)

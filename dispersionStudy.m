@@ -93,7 +93,7 @@ Results = struct('k',{},'gamma',{},'gamma2',{},'kr',{},'tgo',{},'fuel_opt',{},'f
 
 L_ref = 10000; A_ref = planetaryParams.gPlanet; T_ref = sqrt(L_ref/A_ref); V_ref = L_ref/T_ref; M_ref = 15103.0;
 dispTime = tic;
-%% Stats Loop - Requires Parallel Copmuting Toolbox
+%% Stats Loop - Requires Parallel Computing Toolbox
 parfor (idx = 1:caseCount)
     try
         dalt = seeds.alt_seeds(idx) * (r_disp / 3);
