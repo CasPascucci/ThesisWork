@@ -1,5 +1,7 @@
 # Optimizing Fractional-Polynomial Powered Descent Guidance Laws
 
+*Note: this README does not render properly on Github, but will in MATLAB.*
+
 This repository contains the MATLAB implementation for the **"Optimizing Fractional-Polynomial Powered Descent Guidance Laws"** paper. It implements an optimization framework for the **Fractional Polynomial-Powered Descent Guidance (FP2DG)** law, optimizing three parameters to minimize fuel and throttle usage while satisfying hard constraints (glideslope, pointing, thrust).
 
 This codebase demonstrates that by optimizing just three key variables, two polynomial powers ($\gamma_1, \gamma_2$) and the time-to-go ($t_{go}$), the **FP2DG** law can achieve near-optimal fuel performance comparable to complex numerical methods, while retaining the computational efficiency required for onboard flight computers.
@@ -8,14 +10,12 @@ This codebase demonstrates that by optimizing just three key variables, two poly
 
 **FP2DG** enhances classical analytical methods (like Apollo Powered Descent Guidance) with the benefits of modern numerical optimizers into a single flexible framework.
 
-*   **Guidance Law:** The commanded thrust acceleration is defined as a function of time, where $\mathbf{c}_1$ and $\mathbf{c}_2$ are coefficient vectors computed analytically to satisfy boundary conditions (Target Position $\mathbf{r}_f$ and Velocity $\mathbf{v}_f$):
-
-$$\mathbf{a}_T(t) = \mathbf{a}_{T_f}^* + \mathbf{c}_1 t^{\gamma_1} + \mathbf{c}_2 t^{\gamma_2}$$
+*   **Guidance Law:** The commanded thrust acceleration is defined as a function of time:
+    $$ \mathbf{a}_T(t) = \mathbf{a}_{T_f}^* + \mathbf{c}_1 t^{\gamma_1} + \mathbf{c}_2 t^{\gamma_2} $$
+    Where $\mathbf{c}_1$ and $\mathbf{c}_2$ are coefficient vectors computed analytically to satisfy boundary conditions (Target Position $\mathbf{r}_f$ and Velocity $\mathbf{v}_f$).
 
 *   **Optimization:** The algorithm solves a Nonlinear Programming (NLP) problem to find the optimal set $X = [\gamma_1, \gamma_2, t_{go}]$ that minimizes a combined cost function:
-
-$$J = \beta \int ||\mathbf{a}_T|| dt + (1-\beta) \int ||\mathbf{a}_T||^2 dt$$
-
+    $$ J = \beta \int ||\mathbf{a}_T|| dt + (1-\beta) \int ||\mathbf{a}_T||^2 dt $$
     *   $\beta \to 1$: Maximizes fuel efficiency (Minimum Control).
     *   $\beta \to 0$: Maximizes throttle smoothness (Minimum Control Effort).
 
@@ -26,9 +26,11 @@ $$J = \beta \int ||\mathbf{a}_T|| dt + (1-\beta) \int ||\mathbf{a}_T||^2 dt$$
     *   $t_{go} > 0$: Required for a real trajectory.
     *   Additionally, thrust magnitude is constrained at every trajectory node: $T_{min} \leq ||\mathbf{a}_T|| \cdot m \leq T_{max}$. Optional glideslope (position vector angle from vertical) and pointing (thrust vector angle from vertical) constraints can also be enforced.
 
-*   **Simulation:** The optimized $\gamma_1, \gamma_2$ and $t_{go}$ are used in the closed-loop tracking form of FP2DG, which recomputes the commanded acceleration at each integration step using current state feedback, where $k_r = (\gamma_2+2)(\gamma_1+2)$:
+*   **Simulation:** The optimized $\gamma_1, \gamma_2$ and $t_{go}$ are used in the closed-loop tracking form of FP2DG, which recomputes the commanded acceleration at each integration step using current state feedback:
 
-$$\mathbf{a}_T(t) = \gamma_1\!\left(\frac{k_r}{2\gamma_1+4}-1\right)\mathbf{a}_{T_f}^* + \left(\frac{\gamma_1 k_r}{2\gamma_1+4}-\gamma_1-1\right)\mathbf{g} + \frac{\gamma_1+1}{t_{go}}\left(1-\frac{k_r}{\gamma_1+2}\right)(\mathbf{v}_f^*-\mathbf{v}) + \frac{k_r}{t_{go}^2}(\mathbf{r}_f^*-\mathbf{r}-\mathbf{v}\,t_{go})$$ Unlike the open-loop planning form, this tracking law feeds back the current position $\mathbf{r}$ and velocity $\mathbf{v}$, making it robust to perturbations. Time-to-go decrements in real time as the vehicle flies. If thrust magnitude exceeds engine limits, the command is clamped to $T_{min}$ or $T_{max}$. Near landing ($t_{go} \cdot T_{ref} < 0.2$ s), the acceleration command is frozen at its last computed value to avoid the $t_{go} \to 0$ singularity.
+    $$\mathbf{a}_T(t) = \gamma_1\!\left(\frac{k_r}{2\gamma_1+4}-1\right)\mathbf{a}_{T_f}^* + \left(\frac{\gamma_1 k_r}{2\gamma_1+4}-\gamma_1-1\right)\mathbf{g} + \frac{\gamma_1+1}{t_{go}}\left(1-\frac{k_r}{\gamma_1+2}\right)(\mathbf{v}_f^*-\mathbf{v}) + \frac{k_r}{t_{go}^2}(\mathbf{r}_f^*-\mathbf{r}-\mathbf{v}\,t_{go})$$
+
+    where $k_r = (\gamma_2+2)(\gamma_1+2)$. Unlike the open-loop planning form, this tracking law feeds back the current position $\mathbf{r}$ and velocity $\mathbf{v}$, making it robust to perturbations. Time-to-go decrements in real time as the vehicle flies. If thrust magnitude exceeds engine limits, the command is clamped to $T_{min}$ or $T_{max}$. Near landing ($t_{go} \cdot T_{ref} < 0.2$ s), the acceleration command is frozen at its last computed value to avoid the $t_{go} \to 0$ singularity.
 
 ## Functions
 
