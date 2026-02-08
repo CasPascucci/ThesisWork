@@ -124,6 +124,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     xlabel('Time s'); ylabel('Throttle Fraction');
     title('Planned Throttle Profile');
     legend('Location','best');
+    set(gca, 'FontSize', 20);
 
     % Figure 2: Optimization Range vs Altitude
     rdOptimDim = rdOptim*L_ref;
@@ -139,6 +140,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     xlabel('Range km'); ylabel('Up km');
     title('Planned Flight Path (Range vs Alt)');
     legend('Location','best');
+    set(gca, 'FontSize', 20);
     
     % Figure 3: Optimization 3D Trajectory
     UPlotMax = 3000; % Alt filter threshold
@@ -154,6 +156,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
     figure(3); hold on; grid on; axis equal;
     set(gcf, 'Name', 'Optimization 3D');
+    set(gca, 'FontSize', 20);
     
     % Generate Glideslope Cone Visualization
     if isempty(findobj(gca, 'Type', 'Surface'))
@@ -194,12 +197,14 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     zlim([0,2]); xlim([-3,3]); ylim([-3,3]);
     axis square;
     legend('Location','bestoutside');
+    set(gca, 'FontSize', 20);
 
     % Figure 4: Optimization Velocity Profile
     vdOptimDim = vdOptim * V_ref;
     vdOptimTOPO = MCMF2ENU(vdOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
     figure(4); hold on; grid on;
     set(gcf, 'Name', 'Opt Vel TOPO');
+    set(gca, 'FontSize', 20);
     
     plot(tspanOpt*T_ref, vecnorm(vdOptimTOPO, 2, 1), '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
     % plot(tspanOpt*T_ref, vdOptimTOPO(1,:), 'b-', 'LineWidth', 1.0, 'DisplayName', [legendTag ' East']);
@@ -217,6 +222,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     aTOptimTOPO = MCMF2ENU(aTOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
     figure(5); hold on; grid on;
     set(gcf, 'Name', 'Opt Accel TOPO');
+    set(gca, 'FontSize', 20);
     
     plot(tspanOpt(2:end)*T_ref, vecnorm(aTOptimTOPO(:,2:end),2,1), '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName',legendTag);
     % plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(1,2:end), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' East']);
@@ -257,6 +263,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
         figure(6); hold on; grid on; axis equal;
         set(gcf, 'Name', 'Sim 3D');
+        set(gca, 'FontSize', 20);
 
         if isempty(findobj(gca, 'Type', 'Surface'))
             theta_fun = @(u) min(89.9, 45 + 45 * max(0, min(1, (u - 250) ./ 250))); 
@@ -302,6 +309,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         
         figure(7); hold on; grid on;
         set(gcf, 'Name', 'Sim Range vs Altitude');
+        set(gca, 'FontSize', 20);
         plot(arcLength/1000, alt_m/1000, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
         if norm([alt_m(end), arcLength(end)]) > 1
             fprintf("Landing site error > 1m: %.2fm\n", norm([alt_m(end), arcLength(end)]));
@@ -344,6 +352,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         % Figure 9: Velocity Profile
         figure(9); hold on; grid on;
         set(gcf, 'Name', 'Sim Velocity');
+        set(gca, 'FontSize', 20);
 
         plot(tTraj*T_ref, vecnorm(vDim, 2, 2), '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
         % plot(tTraj*T_ref, vE, 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' East']);
@@ -357,6 +366,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         % Figure 10: Throttle and Mass
         figure(10);
         set(gcf, 'Name', 'Sim Throttle and Mass');
+        set(gca, 'FontSize', 20);
 
         subplot(2,1,1); hold on; grid on;
         thrustDim = aTDimNorm' .* mDim;
@@ -379,6 +389,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         % Figure 11: Time vs Altitude
         figure(11); hold on; grid on;
         set(gcf, 'Name', 'Sim Alt');
+        set(gca, 'FontSize', 20);
         plot(tTraj*T_ref, alt_m/1000, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
 
         xlabel('Time s'); ylabel('Altitude m'); title('Time vs Altitude (Dimensional)');
@@ -394,6 +405,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
         figure(12);
         set(gcf, 'Name', 'Pointing Analysis');
+        set(gca, 'FontSize', 20);
         subplot(2,1,1); hold on; grid on;
         plot(tTraj*T_ref, phiSim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
         if optimParams.pointingEnabled
@@ -474,6 +486,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         subplot(3,2,6); hold on; grid on; stairs(x_opt, tgoDiff, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('\Delta t_{go} (Static - ReOpt)'); ylabel('s'); xlabel('Time s'); grid on;
         
         sgtitle('Optimization Parameters Through Reoptimization');
+        set(gca, 'FontSize', 20);
     end
 
 end

@@ -3,6 +3,9 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     
     if nargin > 10
         monteCarlo = true; % 11th arg in is only for Accel Monte Carlo Sim
+    else
+        monteCarlo = false;
+        monteCarloSeed = [];
     end
 
     %% 1. Initialization & Defaults
@@ -143,10 +146,6 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     if monteCarlo
         [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = ...
             closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, monteCarloSeed);
-        [c1_static, c2_static, c1_num, c2_num] = calculateCoeffs(nonDimParams.r0ND, nonDimParams.v0ND, optParams(3), ...
-                                   gammaOpt, gamma2Opt, nonDimParams.afStarND, ...
-                                   nonDimParams.rfStarND, nonDimParams.vfStarND, nonDimParams.gConst);
-        optHistory = [c1_static, c2_static, c1_num, c2_num];
         if ~isempty(optHistory)
             optHistory = array2table(optHistory);
             optHistory.Properties.VariableNames(1:5) = {'t_elapsedND','gamma1','gamma2','kr','tgoND'};

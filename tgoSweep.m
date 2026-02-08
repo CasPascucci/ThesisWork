@@ -117,8 +117,7 @@ plot(tgoVec, costTgoSweep, 'b-', 'LineWidth',2);
 xlabel('Time of Flight of Trajectory'); ylabel('Fuel Consumption from Optimized Trajectory');
 title('Fuel Consumption Sensitivty to $t_{go}$ Sweep','Interpreter','latex');
 subtitle(sprintf("$\\gamma_1$ = %.3f, $\\gamma_2$ = %.3f", fixedGamma1, fixedGamma2), 'Interpreter','latex');
-f1axes = f1.findobj("Type", "axes");
-f1axes.FontSize = 20;
+set(gca, 'FontSize', 20);
 
 
 

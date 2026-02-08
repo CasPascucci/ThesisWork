@@ -3,9 +3,9 @@ clear all;  clc; format short
 addpath([pwd, '/CoordinateFunctions']);
 
 %% Key Parameters
-beta = 1.0;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta = 0.6;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 
-glideSlopeEnabled = true;
+glideSlopeEnabled = false;
 pointingEnabled = false;
 reOptimizationEnabled = false;
 divertEnabled = false; % Will internally force reOpt On, glideSlope and pointing Off

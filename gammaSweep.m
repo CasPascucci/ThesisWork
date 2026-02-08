@@ -131,8 +131,7 @@ xlabel('$\gamma_1$','Interpreter','latex');
 ylabel('$\gamma_2$','Interpreter','latex');
 title('Fuel Consumption Sensitivity to Gamma','Interpreter','latex');
 subtitle(sprintf("$t_{go}$ = %d s", round(fixedTgo)), 'Interpreter','latex');
-f1axes = f1.findobj("Type", "axes");
-f1axes.FontSize = 20;
+set(gca, 'FontSize', 20);
 saveas(f1, fullfile(folderName, 'Fuel_Contour.png'));
 saveas(f1, fullfile(folderName, 'Fuel_Contour.fig'));
 
@@ -145,8 +144,7 @@ xlabel('$\gamma_1$','Interpreter','latex');
 ylabel('$\gamma_2$','Interpreter','latex');
 title('Active Constraints Map','Interpreter','latex');
 subtitle(sprintf("$t_{go}$ = %d s", round(fixedTgo)), 'Interpreter','latex');
-f2axes = f2.findobj("Type", "axes");
-f2axes.FontSize = 20;
+set(gca, 'FontSize', 20);
 saveas(f2, fullfile(folderName, 'Constraints_Map.png'));
 saveas(f2, fullfile(folderName, 'Constraints_Map.fig'));
 
