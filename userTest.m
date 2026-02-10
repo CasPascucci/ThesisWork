@@ -7,7 +7,7 @@ beta = 0.6;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 
 paramsIC = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, tgo (dimensional seconds)
 
-glideSlopeEnabled = true;
+glideSlopeEnabled = false;
 pointingEnabled = false;
 reOptimizationEnabled = false;
 divertEnabled = false; % Will internally force reOpt On, glideSlope and pointing Off
