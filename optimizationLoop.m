@@ -61,10 +61,20 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     
         [c, ~] = nonlincon(optParams);
         activeIneq = find(c >= -1e-6); % Nearly active
+        numActiveIneq = length(activeIneq);
         activeIneqString = strjoin(string(activeIneq),', ');
-        fprintf('\nActive inequality constraints: %d/%d\n', length(activeIneq), length(c));
+        if abs(optParams(1) - optimizationParams.gamma1eps) < 1e-3
+            numActiveIneq = numActiveIneq + 1;
+        end
+        if abs(optParams(2) - optParams(1)) - optimizationParams.gamma1eps < 1e-3
+            numActiveIneq = numActiveIneq + 1;
+        end
+        fprintf('\nTotal active inequality constraints: %d/%d\n', numActiveIneq, length(c));
         if ~isempty(activeIneq)
             fprintf("Constraints #: %s\n", activeIneqString);
+        end
+        if length(activeIneq) ~= numActiveIneq
+            fprintf("Linear constraint also active\n");
         end
         [maxViolation, idx] = max(c);
         fprintf('Max violation: %.3f at constraint %d\n', maxViolation, idx);

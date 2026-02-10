@@ -48,6 +48,7 @@ This codebase demonstrates that by optimizing just three key variables, two poly
 
 **Outputs:**
 *   Console: Optimal parameters (gamma1, gamma2, kr, tgo), fuel cost from optimizer and simulation.
+    * Output of constraints counts up from landing back to PDI, grouped by constraint.
 *   Figures: Full trajectory visualization via `plotting.m`.
 
 ### `getParams.m`

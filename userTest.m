@@ -5,13 +5,15 @@ addpath([pwd, '/CoordinateFunctions']);
 %% Key Parameters
 beta = 0.6;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 
-glideSlopeEnabled = false;
+paramsIC = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, tgo (dimensional seconds)
+
+glideSlopeEnabled = true;
 pointingEnabled = false;
 reOptimizationEnabled = false;
 divertEnabled = false; % Will internally force reOpt On, glideSlope and pointing Off
 
 %% 1. Initial State Definitions
-% PDI (Powered Descent Initiation) State - Dimensional
+% PDI (Powered Descent Initiation) State, Dimensional
 PDIState = struct('altitude', 15240, ... % meters
                   'lonInitDeg', 41.85, ... % deg
                   'latInitDeg', -71.59, ... % deg
@@ -39,7 +41,7 @@ targetState = struct('landingLonDeg', 41.85, ... % deg
 
 %% 2. Optimization Configuration
 optimizationParams = struct;
-optimizationParams.paramsX0 = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, tgo (dimensional)
+optimizationParams.paramsX0 = paramsIC;
 
 optimizationParams.nodeCount = 301; % Node Count for Optimization, must be odd for Simpson's rule
 
@@ -127,10 +129,11 @@ fprintf('Gamma1:      %.4f\n', gammaOpt);
 fprintf('Gamma2:      %.4f\n', gamma2Opt);
 fprintf('Kr:          %.4f\n', krOpt);
 fprintf('Tgo (sec):   %.2f\n', tgoOptSec);
-fprintf('Opt Cost:    %.2f kg\n', optFuelCost);
-fprintf('Sim Cost:    %.2f kg\n', simFuelCost);
+fprintf('Cost Value:  %.4f\n', optTable(3));
+fprintf('Opt Fuel:    %.2f kg\n', optFuelCost);
+fprintf('Sim Fuel:    %.2f kg\n', simFuelCost);
 if exist("optTable","var")
-    table(optTable,simTable, 'VariableNames',["Optimization", "Simulation"],'RowNames',["Landing Error", "Fuel Cost"]);
+    table(optTable(1:2),simTable, 'VariableNames',["Optimization", "Simulation"],'RowNames',["Landing Error", "Fuel Cost"]);
 end
 
 %% 5. Single Segment Re-Run
