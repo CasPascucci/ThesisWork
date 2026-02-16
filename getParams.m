@@ -198,6 +198,10 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     if flag_thrustGotLimited
         fprintf("Simulation Trajectory Thrust Limited!\n")
     end
+
+    % Get Pseudo cost from Simulation
+    aTmagSim = vecnorm(aTSim,2,1);
+    simCost = betaParam* trapz(tTraj,aTmagSim') + (1-betaParam)*trapz(tTraj, dot(aTSim,aTSim)');
     %% 7. Plotting
     if doPlots
         plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, ...
@@ -228,7 +232,7 @@ optTable = [optErrorNorm; optFuelCost; optCost];
 if runSimulation
     simError = MCMF2ENU(stateTraj(end,1:3)', landingLatDeg,landingLonDeg,true,false);
     simErrorNorm = norm(rfLanding*refVals.L_ref - simError*refVals.L_ref);
-    simTable = [simErrorNorm; simFuelCost];
+    simTable = [simErrorNorm; simFuelCost; simCost];
 else
     simTable = [inf;inf];
 end
