@@ -133,7 +133,7 @@ fprintf('Cost Value:  %.4f\n', optTable(3));
 fprintf('Opt Fuel:    %.2f kg\n', optFuelCost);
 fprintf('Sim Fuel:    %.2f kg\n', simFuelCost);
 if exist("optTable","var")
-    table(optTable(1:2),simTable, 'VariableNames',["Optimization", "Simulation"],'RowNames',["Landing Error", "Fuel Cost"]);
+    table(optTable,simTable, 'VariableNames',["Optimization", "Simulation"],'RowNames',["Landing Error", "Fuel Cost", "Cost Function"]);
 end
 
 %% 5. Single Segment Re-Run

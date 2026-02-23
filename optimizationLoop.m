@@ -230,7 +230,7 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     %     idx = idx + nGlideCon;
     % end
     if glideSlopeFlag
-        nGlideCon = nodeCount;;
+        nGlideCon = nodeCount;
         tgospanGlide = tgospan(1:nGlideCon);
         phi1hat = (tgospanGlide.^(gamma1+2))./((gamma1+1)*(gamma1+2));
         phi2hat = (tgospanGlide.^(gamma2+2))./((gamma2+1)*(gamma2+2));
