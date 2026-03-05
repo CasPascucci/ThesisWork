@@ -7,22 +7,22 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     descString = string.empty;
     
     descString(end+1) = sprintf("Beta: %.2f", betaParam);
+    descString(end+1) = sprintf("Throttle Limit");
     if optimParams.updateOpt
         descString(end+1) = "ReOpt";
-    else
-        descString(end+1) = "Static";
+
     end
     if optimParams.pointingEnabled
         descString(end+1) = "Pointing";
     end
     if optimParams.glideSlopeEnabled
-        descString(end+1) = "Glideslope";
+        descString(end+1) = "GS";
     end
     if flag_thrustGotLimited
         descString(end+1) = "Saturated";
     end
     descString = join(descString, "+");
-    legendTag = descString + " @ " + runTime;
+    legendTag = descString;% + " @ " + runTime;
 
 
     % Define Color for each run
@@ -32,7 +32,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         % Count data entries on Fig 1
         fig1Entries = findobj(fig1Handle, 'Type', 'line');
         for i = 1:length(fig1Entries)
-            if contains(fig1Entries(i).DisplayName, '@')
+            if contains(fig1Entries(i).DisplayName, 'B')
                 existingRuns = existingRuns + 1;
             end
         end
@@ -53,6 +53,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     rMoon = problemParams.rMoon; 
     [~, ~, U0] = enuBasis(deg2rad(problemParams.landingLatDeg),deg2rad(problemParams.landingLonDeg));
     isp = nonDimParams.ispND;
+    
 
     % Process Simulation Data
     if hasSimData
@@ -122,7 +123,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     end
     
     xlabel('Time s'); ylabel('Throttle Fraction');
-    title('Planned Throttle Profile');
+    title('Optimization Throttle Profile');
     legend('Location','best');
     set(gca, 'FontSize', 20);
 
@@ -138,7 +139,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
     plot(arcLengthOpt/1000, alt_opt/1000, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
     xlabel('Range km'); ylabel('Up km');
-    title('Planned Flight Path (Range vs Alt)');
+    title('Optimization Flight Path (Range vs Alt)');
     legend('Location','best');
     set(gca, 'FontSize', 20);
     
@@ -192,11 +193,12 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     
    
     xlabel('East (km)'); ylabel('North (km)'); zlabel('Up (km)');
-    title('Planned 3D Trajectory (Final 3km)');
+    title('Optimization 3D Trajectory (Final 2km)');
+    subtitle('With Glideslope Cone');
     view(80, 15); camproj orthographic;
     zlim([0,2]); xlim([-3,3]); ylim([-3,3]);
     axis square;
-    legend('Location','bestoutside');
+    legend('Location','north');
     set(gca, 'FontSize', 20);
 
     % Figure 4: Optimization Velocity Profile
@@ -228,7 +230,11 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     % plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(1,2:end), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' East']);
     % plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(2,2:end), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' North']);
     % plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(3,2:end), 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' Up']);
-    
+
+    if isempty(findobj(gca, 'DisplayName', 'Desired Final Acceleration, a_f^*'))
+        afStarDim = norm(nonDimParams.afStarND) * A_ref;
+        yline(afStarDim, 'k--', 'LineWidth', 1, 'DisplayName', 'Desired Final Acceleration, a_f^*');
+    end
     legend('Location', 'best');
     xlabel('Time s'); ylabel('Accel m/s^2'); title('Planned Accel Profile (TOPO)');
     grid on;
